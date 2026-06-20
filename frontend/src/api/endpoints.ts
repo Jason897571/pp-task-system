@@ -16,6 +16,7 @@ import type {
   TaskDetail,
   AdminUser,
   UpdateUserBody,
+  User,
 } from './types'
 
 // --- Auth ---
@@ -88,6 +89,11 @@ export const createDepartment = (name: string) =>
 
 export const getAdminUsers = () =>
   api.get<AdminUser[]>('/admin/users').then((r) => r.data)
+
+// Assignable candidates for assign/approve dropdowns — usable by admins
+// (own-department members), unlike /admin/users which is super_admin only.
+export const getAssignableUsers = () =>
+  api.get<User[]>('/users').then((r) => r.data)
 
 export const createUser = (body: CreateUserBody) =>
   api.post<CreatedUser>('/admin/users', body).then((r) => r.data)

@@ -420,6 +420,32 @@ def test_pool_department_isolation(client, world):
     assert all(p["id"] != t["id"] for p in pool)
 
 
+def test_member_can_view_pool_task_detail(client, world):
+    """Regression: a member must be able to open the detail of an open pool
+    task in their own department/board (to apply), but not a non-own on-board
+    task, and not another department's pool task."""
+    admin = auth_header(client, "admin", "pw")
+    member = auth_header(client, "member", "pw")
+    mkt_member = auth_header(client, "mkt_member", "pw")
+
+    pool_task = client.post(
+        "/api/tasks", headers=admin, json={"title": "研发池任务", "board_id": world["board"].id}
+    ).json()
+    # member (same dept) can view the pool task detail
+    assert client.get(f"/api/tasks/{pool_task['id']}", headers=member).status_code == 200
+    # market member (other dept) cannot
+    assert client.get(f"/api/tasks/{pool_task['id']}", headers=mkt_member).status_code == 403
+
+    # a task assigned to member2 (on board) is NOT visible to member
+    assigned = client.post(
+        "/api/tasks",
+        headers=admin,
+        json={"title": "别人的任务", "board_id": world["board"].id, "assignee_id": world["member2"].id},
+    ).json()
+    assert assigned["lifecycle"] == "on_board"
+    assert client.get(f"/api/tasks/{assigned['id']}", headers=member).status_code == 403
+
+
 # --------------------------------------------------------------------------
 # Cross-department assignment + reassign
 # --------------------------------------------------------------------------

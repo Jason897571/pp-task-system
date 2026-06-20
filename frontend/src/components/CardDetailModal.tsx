@@ -4,7 +4,7 @@ import {
   applyTask,
   approveTask,
   assignTask,
-  getAdminUsers,
+  getAssignableUsers,
   getTask,
   reviewTask,
   startTask,
@@ -34,8 +34,8 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
 
   // Candidate assignees for admin assign/approve — only admins fetch the directory.
   const { data: users = [] } = useQuery({
-    queryKey: ['admin-users-lite'],
-    queryFn: getAdminUsers,
+    queryKey: ['assignable-users'],
+    queryFn: getAssignableUsers,
     enabled: user?.role === 'admin' || user?.role === 'super_admin',
   })
 

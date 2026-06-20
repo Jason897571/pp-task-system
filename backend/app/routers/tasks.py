@@ -44,9 +44,20 @@ def _visible_to(db: Session, user: User, task: Task) -> bool:
     if user.role == "super_admin":
         return True
     if user.role == "admin":
-        return admin_can_touch_task(user, task)
-    # member: only own assigned/self-submitted tasks
-    return task.assignee_id == user.id or task.creator_id == user.id
+        if admin_can_touch_task(user, task):
+            return True
+    elif task.assignee_id == user.id or task.creator_id == user.id:
+        # member: own assigned/self-submitted tasks
+        return True
+    # anyone may view an open pool task within their visible board + department
+    # (needed to open the detail before applying); mirrors the /pool filter.
+    if (
+        task.lifecycle == "open"
+        and task.department_id == user.department_id
+        and board_can_see(db, user, task.board_id)
+    ):
+        return True
+    return False
 
 
 @router.get("/tasks", response_model=list[TaskOut])
