@@ -1,0 +1,312 @@
+:root {
+  --bg-grad: linear-gradient(135deg, #3d2a5e 0%, #523568 45%, #6b3f6a 100%);
+  --list-bg: #1d2125f2;
+  --card-bg: #22272b;
+  --card-hover: #282e33;
+  --text: #b6c2cf;
+  --subtle: #9fadbc;
+  --heading: #dee4ea;
+  --line: #ffffff1f;
+  --blue: #579dff;
+  --shadow-card: 0 1px 2px #00000066;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: var(--text);
+  background: #1a1126;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Top bar ---- */
+.topbar {
+  height: 44px;
+  background: #1d2125;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--text);
+  flex-shrink: 0;
+  border-bottom: 1px solid #ffffff14;
+}
+.topbar .logo {
+  font-weight: 700;
+  color: #fff;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.topbar .logo .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+.topbar .spacer {
+  flex: 1;
+}
+
+/* ---- App layout ---- */
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: #1d2125;
+  border-right: 1px solid #ffffff14;
+  padding: 12px 8px;
+  overflow-y: auto;
+}
+.sidebar .grp {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--subtle);
+  padding: 8px 10px 4px;
+  letter-spacing: 0.04em;
+}
+.sidebar .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  text-decoration: none;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+.sidebar .nav-item:hover {
+  background: #ffffff14;
+}
+.sidebar .nav-item.active {
+  background: #ffffff24;
+  color: #fff;
+}
+
+.main-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-grad);
+  overflow: hidden;
+}
+
+/* ---- Board ---- */
+.board-header {
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  background: #00000033;
+  color: #fff;
+}
+.board-header .title {
+  font-size: 18px;
+  font-weight: 700;
+}
+.lists {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  overflow-x: auto;
+  align-items: flex-start;
+}
+.list {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--list-bg);
+  border-radius: 12px;
+  padding: 8px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ffffff0f;
+}
+.list-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--heading);
+}
+.list-head .count {
+  background: #ffffff14;
+  color: var(--subtle);
+  border-radius: 10px;
+  font-size: 12px;
+  padding: 0 7px;
+  line-height: 18px;
+  font-weight: 500;
+}
+.list-head .lspacer {
+  flex: 1;
+}
+.cards {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px;
+  min-height: 8px;
+}
+.cards.drag-over {
+  background: #ffffff12;
+  border-radius: 8px;
+  outline: 2px dashed #ffffff33;
+}
+
+/* ---- Card ---- */
+.card {
+  background: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  padding: 8px 10px 10px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+}
+.card:hover {
+  border-color: var(--blue);
+  background: var(--card-hover);
+}
+.card.dragging {
+  opacity: 0.5;
+}
+.card-title {
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--text);
+}
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--subtle);
+}
+.badge.due {
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.badge.due.soon {
+  background: #4a3a06;
+  color: #f5cd47;
+}
+.badge.due.over {
+  background: #5d1f1a;
+  color: #ff9c8f;
+}
+.badge.due.done {
+  background: #1c3a2c;
+  color: #7ee2b8;
+}
+.badge.rework {
+  background: #5d1f1a;
+  color: #ff9c8f;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.badge.must {
+  background: #4a3a06;
+  color: #f5cd47;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.badge.prio-high {
+  color: #ff9c8f;
+  font-weight: 700;
+}
+.card-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.av-sm {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+.add-card {
+  color: var(--subtle);
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 6px;
+}
+.add-card:hover {
+  background: #ffffff14;
+  color: var(--text);
+}
+
+/* ---- Centering wrappers ---- */
+.auth-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--bg-grad);
+}
+.auth-card {
+  width: 360px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 28px 24px;
+  box-shadow: 0 8px 32px #00000066;
+}
+.page-pad {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+}
+.modal-action-grp {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
