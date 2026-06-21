@@ -1,8 +1,7 @@
 """Full data model per design spec §4.
 
-MVP endpoints only use a subset. Models for deferred features (RecurringTask,
-Tag, Checklist, Attachment, Notification, ...) are defined here so the schema is
-complete, but their endpoints are NOT implemented (see TODOs in routers).
+Round-2 features (RecurringTask, Tag, Checklist, Attachment, Notification, ...)
+are now wired to endpoints; see the round-2 routers.
 """
 
 from datetime import datetime
@@ -122,6 +121,13 @@ class Task(Base):
     applications: Mapped[list["TaskApplication"]] = relationship(
         back_populates="task", order_by="TaskApplication.created_at"
     )
+    tags: Mapped[list["Tag"]] = relationship(
+        secondary="task_tags", order_by="Tag.id"
+    )
+    checklists: Mapped[list["Checklist"]] = relationship(
+        back_populates="task", order_by="Checklist.position",
+        cascade="all, delete-orphan",
+    )
 
 
 class TaskApplication(Base):
@@ -168,7 +174,6 @@ class TaskActivity(Base):
 
 
 class RecurringTask(Base):
-    # TODO: scheduler (APScheduler) + endpoints not implemented in MVP.
     __tablename__ = "recurring_tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -183,9 +188,12 @@ class RecurringTask(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    assignees: Mapped[list["User"]] = relationship(
+        secondary="recurring_task_assignees", order_by="User.id"
+    )
+
 
 class RecurringTaskAssignee(Base):
-    # TODO: deferred.
     __tablename__ = "recurring_task_assignees"
 
     recurring_task_id: Mapped[int] = mapped_column(
@@ -195,7 +203,6 @@ class RecurringTaskAssignee(Base):
 
 
 class Tag(Base):
-    # TODO: deferred.
     __tablename__ = "tags"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -204,7 +211,6 @@ class Tag(Base):
 
 
 class TaskTag(Base):
-    # TODO: deferred.
     __tablename__ = "task_tags"
 
     task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"), primary_key=True)
@@ -212,7 +218,6 @@ class TaskTag(Base):
 
 
 class Checklist(Base):
-    # TODO: deferred.
     __tablename__ = "checklists"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -221,9 +226,14 @@ class Checklist(Base):
     position: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    task: Mapped[Task] = relationship(back_populates="checklists")
+    items: Mapped[list["ChecklistItem"]] = relationship(
+        back_populates="checklist", order_by="ChecklistItem.position",
+        cascade="all, delete-orphan",
+    )
+
 
 class ChecklistItem(Base):
-    # TODO: deferred.
     __tablename__ = "checklist_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -233,9 +243,10 @@ class ChecklistItem(Base):
     position: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    checklist: Mapped[Checklist] = relationship(back_populates="items")
+
 
 class Attachment(Base):
-    # TODO: file upload deferred.
     __tablename__ = "attachments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -248,9 +259,10 @@ class Attachment(Base):
     content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    uploader: Mapped[User] = relationship()
+
 
 class Notification(Base):
-    # TODO: deferred.
     __tablename__ = "notifications"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
