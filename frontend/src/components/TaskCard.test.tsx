@@ -32,22 +32,22 @@ describe('CardFront checklist badge', () => {
     const task = makeTask({ checklist_stats: { done: 2, total: 5 } })
     const { container } = render(<CardFront task={task} columnKind="doing" />)
     expect(screen.getByText('☑ 2/5')).toBeInTheDocument()
-    const badge = container.querySelector('.badge.checklist')
-    expect(badge).toBeInTheDocument()
-    expect(badge?.classList.contains('done')).toBe(false)
+    const chip = container.querySelector('.mchip.cl')
+    expect(chip).toBeInTheDocument()
+    expect(chip?.classList.contains('cl-done')).toBe(false)
   })
 
   it('renders green when all items done', () => {
     const task = makeTask({ checklist_stats: { done: 4, total: 4 } })
     const { container } = render(<CardFront task={task} columnKind="doing" />)
     expect(screen.getByText('☑ 4/4')).toBeInTheDocument()
-    expect(container.querySelector('.badge.checklist.done')).toBeInTheDocument()
+    expect(container.querySelector('.mchip.cl.cl-done')).toBeInTheDocument()
   })
 
   it('hides the badge when there are no checklist items', () => {
     const task = makeTask({ checklist_stats: { done: 0, total: 0 } })
     const { container } = render(<CardFront task={task} columnKind="doing" />)
-    expect(container.querySelector('.badge.checklist')).not.toBeInTheDocument()
+    expect(container.querySelector('.mchip.cl')).not.toBeInTheDocument()
   })
 })
 

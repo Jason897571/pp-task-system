@@ -27,6 +27,7 @@ function DraggableCard({
     <div
       ref={setNodeRef}
       className={`card ${isDragging ? 'dragging' : ''}`}
+      data-spine={task.priority === 'high' ? 'high' : undefined}
       onClick={() => onOpen(task.id)}
       {...(draggable ? { ...listeners, ...attributes } : {})}
     >

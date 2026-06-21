@@ -189,77 +189,105 @@ body {
 
 /* ---- Card ---- */
 .card {
-  background: var(--card-bg);
-  border-radius: 8px;
+  position: relative;
+  background: linear-gradient(180deg, #262c31 0%, #1f242a 100%);
+  border-radius: 10px;
   box-shadow: var(--shadow-card);
-  padding: 8px 10px 10px;
+  padding: 12px 14px 13px;
   cursor: pointer;
-  border: 1px solid var(--line);
+  border: 1px solid #ffffff12;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
 }
 .card:hover {
-  border-color: var(--blue);
-  background: var(--card-hover);
+  border-color: #4794ff77;
+  background: linear-gradient(180deg, #2a3037 0%, #23282e 100%);
+  box-shadow: 0 7px 18px -7px #000000b3;
+  transform: translateY(-1px);
 }
 .card.dragging {
   opacity: 0.5;
 }
-.card-title {
-  font-size: 14px;
-  line-height: 1.35;
-  color: var(--text);
+/* Signature: a red spine flags high-priority cards (no text badge needed). */
+.card[data-spine='high']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #f87168;
 }
-.badges {
+.card-title {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--heading);
+  letter-spacing: 0.1px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.card-divider {
+  height: 1px;
+  background: #ffffff14;
+  margin: 11px 0;
+}
+.card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.meta-chips {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
+  min-width: 0;
 }
-.badge {
+.mchip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: 12px;
+  gap: 4px;
+  height: 19px;
+  padding: 0 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #ffffff10;
   color: var(--subtle);
+  white-space: nowrap;
 }
-.badge.due {
-  padding: 1px 6px;
-  border-radius: 4px;
+.mchip.ghost {
+  background: transparent;
+  padding: 0 2px;
 }
-.badge.due.soon {
-  background: #4a3a06;
+.mchip.due-soon {
+  background: #4a3a0699;
   color: #f5cd47;
 }
-.badge.due.over {
-  background: #5d1f1a;
+.mchip.due-over {
+  background: #5d1f1aa6;
   color: #ff9c8f;
 }
-.badge.due.done {
+.mchip.due-done {
+  background: #1c3a2c99;
+  color: #7ee2b8;
+}
+.mchip.cl-done {
   background: #1c3a2c;
   color: #7ee2b8;
 }
-.badge.rework {
+.mchip.must {
+  background: #46340699;
+  color: #ffce6a;
+}
+.mchip.rework {
   background: #5d1f1a;
   color: #ff9c8f;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-weight: 600;
-}
-.badge.must {
-  background: #4a3a06;
-  color: #f5cd47;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-weight: 600;
-}
-.badge.prio-high {
-  color: #ff9c8f;
-  font-weight: 700;
-}
-.card-foot {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 8px;
 }
 .av-sm {
   width: 24px;
@@ -270,6 +298,12 @@ body {
   font-size: 11px;
   font-weight: 700;
   color: #fff;
+}
+.card-av {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px #20252a, 0 1px 3px #00000066;
 }
 .add-card {
   color: var(--subtle);
@@ -315,31 +349,22 @@ body {
 .card-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 6px;
+  gap: 5px;
+  margin-bottom: 9px;
 }
 .card-tag {
-  height: 16px;
-  min-width: 36px;
-  border-radius: 4px;
-  padding: 0 6px;
+  height: 18px;
+  line-height: 18px;
+  border-radius: 9px;
+  padding: 0 9px;
   font-size: 11px;
   font-weight: 600;
-  color: #1d2125;
-  line-height: 16px;
-  max-width: 120px;
+  color: #15191d;
+  max-width: 130px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.badge.checklist {
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: #ffffff14;
-}
-.badge.checklist.done {
-  background: #1c3a2c;
-  color: #7ee2b8;
+  box-shadow: inset 0 -1px 0 #00000026;
 }
 
 /* ---- Tag chips (modal) ---- */

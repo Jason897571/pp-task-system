@@ -16,7 +16,9 @@ export const TAG_COLORS: Record<TagColor, string> = {
 export const TAG_COLOR_KEYS = Object.keys(TAG_COLORS) as TagColor[]
 
 export function initial(fullName: string): string {
-  return fullName ? fullName.slice(-1) : '?'
+  if (!fullName) return '?'
+  // Latin names → first letter uppercased; CJK names → surname (first char).
+  return /^[a-zA-Z]/.test(fullName) ? fullName[0].toUpperCase() : fullName[0]
 }
 
 // Stable color from a name (Trello-ish palette) for avatars.
