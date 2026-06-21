@@ -1,5 +1,5 @@
 import type { ColumnKind, Task } from '../api/types'
-import { avatarColor, dueLabel, dueState, initial, TAG_COLORS } from '../lib/badges'
+import { avatarColor, dueLabel, dueState, initial } from '../lib/badges'
 
 // Card front (spec §7.3). Layout: colored label pills → title → hairline
 // divider → meta row (status chips on the left, assignee avatar on the right).
@@ -49,20 +49,6 @@ export function CardFront({ task, columnKind }: { task: Task; columnKind: Column
 
   return (
     <>
-      {task.tags.length > 0 && (
-        <div className="card-tags">
-          {task.tags.map((t) => (
-            <span
-              key={t.id}
-              className="card-tag"
-              style={{ background: TAG_COLORS[t.color] }}
-              title={t.name}
-            >
-              {t.name}
-            </span>
-          ))}
-        </div>
-      )}
       <div className="card-title">{task.title}</div>
       {(chips.length > 0 || task.assignee) && (
         <>

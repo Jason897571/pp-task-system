@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { CardFront } from './TaskCard'
-import { TAG_COLORS } from '../lib/badges'
 import type { Task } from '../api/types'
 
 function makeTask(over: Partial<Task>): Task {
@@ -50,32 +49,3 @@ describe('CardFront checklist badge', () => {
     expect(container.querySelector('.mchip.cl')).not.toBeInTheDocument()
   })
 })
-
-describe('CardFront tag color bars', () => {
-  it('renders a colored bar per tag using the palette color', () => {
-    const task = makeTask({
-      tags: [
-        { id: 1, name: '紧急', color: 'red' },
-        { id: 2, name: '后端', color: 'blue' },
-      ],
-    })
-    const { container } = render(<CardFront task={task} columnKind="start" />)
-    const tags = container.querySelectorAll('.card-tag')
-    expect(tags).toHaveLength(2)
-    expect(screen.getByText('紧急')).toBeInTheDocument()
-    expect((tags[0] as HTMLElement).style.background).toBe(hexToRgb(TAG_COLORS.red))
-    expect((tags[1] as HTMLElement).style.background).toBe(hexToRgb(TAG_COLORS.blue))
-  })
-
-  it('renders no tag container when there are no tags', () => {
-    const task = makeTask({ tags: [] })
-    const { container } = render(<CardFront task={task} columnKind="start" />)
-    expect(container.querySelector('.card-tags')).not.toBeInTheDocument()
-  })
-})
-
-// jsdom normalizes inline style colors to rgb(); convert the palette hex for comparison.
-function hexToRgb(hex: string): string {
-  const n = parseInt(hex.slice(1), 16)
-  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`
-}

@@ -106,7 +106,7 @@ export function AppShell() {
         </span>
         <Input
           className="topbar-search"
-          placeholder="搜索卡片 / 负责人 / 标签"
+          placeholder="搜索卡片 / 负责人"
           style={{ width: 240, marginLeft: 10 }}
           size="small"
           // TODO: wire global search once backend supports a search endpoint.

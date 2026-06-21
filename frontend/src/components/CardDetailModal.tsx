@@ -15,7 +15,6 @@ import { errMessage } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import type { BoardColumn, User } from '../api/types'
 import { CardActions } from './CardActions'
-import { TagsSection } from './TagsSection'
 import { ChecklistsSection } from './ChecklistsSection'
 import { AttachmentsSection, AttachmentList } from './AttachmentsSection'
 import { avatarColor, dueLabel, dueState, initial } from '../lib/badges'
@@ -175,12 +174,6 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
               </div>
             </section>
 
-            <TagsSection
-              taskId={task.id}
-              tags={task.tags}
-              canEdit={canEdit}
-              onChanged={invalidate}
-            />
             <ChecklistsSection
               taskId={task.id}
               checklists={task.checklists}
