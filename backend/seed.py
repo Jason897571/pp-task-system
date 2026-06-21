@@ -11,8 +11,14 @@ from app.database import SessionLocal
 from app.models import (
     Board,
     BoardColumn,
+    Checklist,
+    ChecklistItem,
     Department,
+    RecurringTask,
+    RecurringTaskAssignee,
+    Tag,
     Task,
+    TaskTag,
     User,
 )
 from app.security import hash_password
@@ -65,6 +71,43 @@ def ensure_task(db: Session, title: str, **kwargs) -> Task:
         db.add(task)
         db.flush()
     return task
+
+
+def ensure_tag(db: Session, name: str, color: str) -> Tag:
+    tag = db.scalars(select(Tag).where(Tag.name == name)).first()
+    if tag is None:
+        tag = Tag(name=name, color=color)
+        db.add(tag)
+        db.flush()
+    return tag
+
+
+def attach_tag(db: Session, task: Task, tag: Tag) -> None:
+    exists = db.scalars(
+        select(TaskTag).where(TaskTag.task_id == task.id, TaskTag.tag_id == tag.id)
+    ).first()
+    if exists is None:
+        db.add(TaskTag(task_id=task.id, tag_id=tag.id))
+
+
+def ensure_recurring(db: Session, title: str, **kwargs) -> RecurringTask:
+    tpl = db.scalars(select(RecurringTask).where(RecurringTask.title == title)).first()
+    if tpl is None:
+        tpl = RecurringTask(title=title, **kwargs)
+        db.add(tpl)
+        db.flush()
+    return tpl
+
+
+def ensure_recurring_assignee(db: Session, tpl: RecurringTask, user: User) -> None:
+    exists = db.scalars(
+        select(RecurringTaskAssignee).where(
+            RecurringTaskAssignee.recurring_task_id == tpl.id,
+            RecurringTaskAssignee.user_id == user.id,
+        )
+    ).first()
+    if exists is None:
+        db.add(RecurringTaskAssignee(recurring_task_id=tpl.id, user_id=user.id))
 
 
 def main() -> None:
@@ -125,7 +168,7 @@ def main() -> None:
         now = datetime.now(timezone.utc)
 
         # on-board tasks spread across columns
-        ensure_task(
+        doc_task = ensure_task(
             db,
             "编写接口文档",
             description="完成后端 API 文档",
@@ -225,6 +268,48 @@ def main() -> None:
             lifecycle="open",
             priority="low",
         )
+
+        # --- round-2 seed: tags, checklist, recurring template ---
+        urgent = ensure_tag(db, "紧急", "red")
+        design = ensure_tag(db, "设计", "purple")
+        backend = ensure_tag(db, "后端", "blue")
+        docs = ensure_tag(db, "文档", "gray")
+
+        # attach a couple tags to an existing task
+        attach_tag(db, doc_task, urgent)
+        attach_tag(db, doc_task, docs)
+
+        # one checklist with items on a seeded task
+        checklist = db.scalars(
+            select(Checklist).where(Checklist.task_id == doc_task.id)
+        ).first()
+        if checklist is None:
+            checklist = Checklist(task_id=doc_task.id, title="文档检查清单", position=0)
+            db.add(checklist)
+            db.flush()
+            for i, content in enumerate(["列出所有接口", "补充错误码", "前端确认字段"]):
+                db.add(
+                    ChecklistItem(
+                        checklist_id=checklist.id,
+                        content=content,
+                        is_done=(i == 0),
+                        position=i,
+                    )
+                )
+
+        # one active recurring template
+        weekly = ensure_recurring(
+            db,
+            "每周周报",
+            description="每周一生成，周五 18:00 截止",
+            creator_id=admin.id,
+            department_id=rnd.id,
+            priority="normal",
+            day_of_week=0,
+            is_active=True,
+        )
+        ensure_recurring_assignee(db, weekly, member)
+        ensure_recurring_assignee(db, weekly, member2)
 
         db.commit()
         print("Seed complete.")

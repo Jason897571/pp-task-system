@@ -6,7 +6,14 @@ from app.database import get_db
 from app.deps import get_current_user, require_admin
 from app.models import Task, TaskApplication, User
 from app.schemas import ApplicationOut, TaskOut
-from app.services import admin_can_touch_task, board_can_see, visible_board_ids
+from app.services import (
+    admin_can_touch_task,
+    board_can_see,
+    dept_admins,
+    notify,
+    serialize_task,
+    visible_board_ids,
+)
 
 router = APIRouter(prefix="/api", tags=["pool"])
 
@@ -31,7 +38,7 @@ def list_pool(
     if user.role != "super_admin":
         rows = [t for t in rows if t.department_id == user.department_id]
 
-    return [TaskOut.model_validate(t) for t in rows]
+    return [serialize_task(db, t) for t in rows]
 
 
 @router.post("/tasks/{task_id}/apply")
@@ -58,6 +65,14 @@ def apply_task(
     ).first()
     if existing is None:
         db.add(TaskApplication(task_id=task_id, applicant_id=user.id))
+        for admin in dept_admins(db, task.department_id):
+            notify(
+                db,
+                admin.id,
+                "applied",
+                f"{user.full_name} 申请了任务「{task.title}」",
+                task.id,
+            )
         db.commit()
     return {"ok": True}
 

@@ -26,6 +26,10 @@ from app.services import (
     board_can_see,
     column_of_kind,
     log_activity,
+    notify,
+    review_admin_for,
+    serialize_task,
+    serialize_task_detail,
     start_column,
     visible_board_ids,
 )
@@ -83,7 +87,7 @@ def list_tasks(
 
     rows = db.scalars(stmt.order_by(Task.id)).all()
     rows = [t for t in rows if _visible_to(db, user, t)]
-    return [TaskOut.model_validate(t) for t in rows]
+    return [serialize_task(db, t) for t in rows]
 
 
 @router.post("/tasks", response_model=TaskOut)
@@ -129,6 +133,7 @@ def create_task(
         db.add(task)
         db.flush()
         log_activity(db, task, user, "assigned")
+        notify(db, assignee.id, "assigned", f"你被指派了任务「{task.title}」", task.id)
     else:
         # admin w/o assignee -> open pool
         task.lifecycle = "open"
@@ -139,7 +144,7 @@ def create_task(
         db.add(task)
     db.commit()
     db.refresh(task)
-    return TaskOut.model_validate(task)
+    return serialize_task(db, task)
 
 
 @router.get("/tasks/{task_id}", response_model=TaskDetailOut)
@@ -153,7 +158,7 @@ def get_task(
         raise HTTPException(status_code=404, detail="任务不存在")
     if not _visible_to(db, user, task):
         raise HTTPException(status_code=403, detail="无权查看该任务")
-    return TaskDetailOut.model_validate(task)
+    return serialize_task_detail(db, task)
 
 
 @router.post("/tasks/{task_id}/assign", response_model=TaskOut)
@@ -187,9 +192,10 @@ def assign_task(
         task.column_id = col.id
 
     log_activity(db, task, user, "reassigned" if is_reassign else "assigned")
+    notify(db, assignee.id, "assigned", f"你被指派了任务「{task.title}」", task.id)
     db.commit()
     db.refresh(task)
-    return TaskOut.model_validate(task)
+    return serialize_task(db, task)
 
 
 @router.post("/tasks/{task_id}/approve", response_model=TaskOut)
@@ -213,7 +219,7 @@ def approve_task(
         log_activity(db, task, user, "rejected")
         db.commit()
         db.refresh(task)
-        return TaskOut.model_validate(task)
+        return serialize_task(db, task)
 
     if body.assignee_id is None:
         raise HTTPException(status_code=400, detail="通过审批必须指派接收人")
@@ -229,9 +235,10 @@ def approve_task(
     task.column_id = col.id
     log_activity(db, task, user, "approved")
     log_activity(db, task, user, "assigned")
+    notify(db, assignee.id, "assigned", f"你被指派了任务「{task.title}」", task.id)
     db.commit()
     db.refresh(task)
-    return TaskOut.model_validate(task)
+    return serialize_task(db, task)
 
 
 @router.post("/tasks/{task_id}/move", response_model=TaskOut)
@@ -264,7 +271,7 @@ def move_task(
     task.column_id = col.id
     db.commit()
     db.refresh(task)
-    return TaskOut.model_validate(task)
+    return serialize_task(db, task)
 
 
 @router.post("/tasks/{task_id}/start", response_model=TaskOut)
@@ -286,7 +293,7 @@ def start_task(
     task.column_id = doing.id
     db.commit()
     db.refresh(task)
-    return TaskOut.model_validate(task)
+    return serialize_task(db, task)
 
 
 @router.post("/tasks/{task_id}/submit", response_model=TaskOut)
@@ -310,9 +317,12 @@ def submit_task(
     db.add(Deliverable(task_id=task.id, submitter_id=user.id, note=body.note))
     task.column_id = review.id
     log_activity(db, task, user, "submitted", comment=body.note)
+    reviewer = review_admin_for(db, task)
+    if reviewer is not None:
+        notify(db, reviewer.id, "submitted", f"任务「{task.title}」已提交待审核", task.id)
     db.commit()
     db.refresh(task)
-    return TaskOut.model_validate(task)
+    return serialize_task(db, task)
 
 
 @router.post("/tasks/{task_id}/review", response_model=TaskOut)
@@ -337,6 +347,8 @@ def review_task(
         task.column_id = done.id
         task.is_rework = False
         log_activity(db, task, user, "approved")
+        if task.assignee_id is not None:
+            notify(db, task.assignee_id, "reviewed", f"任务「{task.title}」已通过审核", task.id)
     else:
         if not body.comment:
             raise HTTPException(status_code=400, detail="打回必须填写原因")
@@ -346,7 +358,9 @@ def review_task(
         task.column_id = doing.id
         task.is_rework = True
         log_activity(db, task, user, "rejected", comment=body.comment)
+        if task.assignee_id is not None:
+            notify(db, task.assignee_id, "reviewed", f"任务「{task.title}」被打回：{body.comment}", task.id)
 
     db.commit()
     db.refresh(task)
-    return TaskOut.model_validate(task)
+    return serialize_task(db, task)

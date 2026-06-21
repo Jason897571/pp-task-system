@@ -44,6 +44,19 @@ class BoardColumnOut(BaseModel):
     kind: str | None
 
 
+class TagOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    color: str
+
+
+class ChecklistStats(BaseModel):
+    done: int
+    total: int
+
+
 class TaskOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -62,6 +75,21 @@ class TaskOut(BaseModel):
     due_date: datetime | None
     created_at: datetime
     updated_at: datetime
+    tags: list[TagOut] = []
+    checklist_stats: ChecklistStats = ChecklistStats(done=0, total=0)
+
+
+class AttachmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    owner_type: str
+    owner_id: int
+    filename: str
+    filesize: int
+    content_type: str | None
+    uploader: UserOut
+    created_at: datetime
 
 
 class DeliverableOut(BaseModel):
@@ -71,6 +99,7 @@ class DeliverableOut(BaseModel):
     submitter: UserOut
     note: str | None
     created_at: datetime
+    attachments: list[AttachmentOut] = []
 
 
 class ApplicationOut(BaseModel):
@@ -81,9 +110,29 @@ class ApplicationOut(BaseModel):
     created_at: datetime
 
 
+class ChecklistItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    content: str
+    is_done: bool
+    position: int
+
+
+class ChecklistOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    position: int
+    items: list[ChecklistItemOut] = []
+
+
 class TaskDetailOut(TaskOut):
     deliverables: list[DeliverableOut]
     applications: list[ApplicationOut]
+    checklists: list[ChecklistOut] = []
+    attachments: list[AttachmentOut] = []
 
 
 # ---- request bodies ----
@@ -185,3 +234,74 @@ class SubmitIn(BaseModel):
 class ReviewIn(BaseModel):
     approve: bool
     comment: str | None = None
+
+
+# ---- round-2 request bodies / outputs ----
+
+
+class TagIn(BaseModel):
+    name: str
+    color: str
+
+
+class TaskTagsIn(BaseModel):
+    tag_ids: list[int]
+
+
+class ChecklistIn(BaseModel):
+    title: str
+
+
+class ChecklistUpdateIn(BaseModel):
+    title: str | None = None
+    position: int | None = None
+
+
+class ChecklistItemIn(BaseModel):
+    content: str
+
+
+class ChecklistItemUpdateIn(BaseModel):
+    is_done: bool | None = None
+    content: str | None = None
+    position: int | None = None
+
+
+class RecurringTaskIn(BaseModel):
+    title: str
+    description: str | None = None
+    priority: str | None = "normal"
+    day_of_week: int = 0
+    assignee_ids: list[int] = []
+
+
+class RecurringTaskUpdateIn(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    priority: str | None = None
+    day_of_week: int | None = None
+    is_active: bool | None = None
+    assignee_ids: list[int] | None = None
+
+
+class RecurringTaskOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    description: str | None
+    priority: str
+    day_of_week: int
+    is_active: bool
+    assignees: list[UserOut] = []
+
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    type: str
+    message: str
+    related_task_id: int | None
+    is_read: bool
+    created_at: datetime
