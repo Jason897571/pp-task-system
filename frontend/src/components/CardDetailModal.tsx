@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Button, Input, Modal, Spin, Upload, App as AntApp } from 'antd'
+import { Button, DatePicker, Input, Modal, Spin, Upload, App as AntApp } from 'antd'
 import type { UploadFile } from 'antd'
+import dayjs from 'dayjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   applyTask,
@@ -86,7 +87,10 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
     mutationFn: (b: { approve: boolean; assignee_id?: number }) => approveTask(taskId, b),
   })
   const assignM = useMutation({ mutationFn: (id: number) => assignTask(taskId, id) })
-  const updateM = useMutation({ mutationFn: (description: string) => updateTask(taskId, { description }) })
+  const updateM = useMutation({
+    mutationFn: (body: { description?: string; due_date?: string | null }) =>
+      updateTask(taskId, body),
+  })
 
   const busy =
     startM.isPending ||
@@ -114,10 +118,20 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
 
   const saveDesc = () => {
     updateM
-      .mutateAsync(descDraft)
+      .mutateAsync({ description: descDraft })
       .then(() => {
         message.success('已更新描述')
         setEditingDesc(false)
+        invalidate()
+      })
+      .catch((e) => message.error(errMessage(e)))
+  }
+
+  const saveDue = (due: string | null) => {
+    updateM
+      .mutateAsync({ due_date: due })
+      .then(() => {
+        message.success(due ? '已更新截止时间' : '已清除截止时间')
         invalidate()
       })
       .catch((e) => message.error(errMessage(e)))
@@ -187,7 +201,9 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
               )}
               <span className="cm-chip">{column ? column.name : lifecycleLabel(task.lifecycle)}</span>
               {task.due_date && due && (
-                <span className="cm-chip due">🕒 {dueLabel(task.due_date)}</span>
+                <span className={`cm-chip ${due === 'over' ? 'rw' : 'due'}`}>
+                  🕒 {dueLabel(task.due_date)}
+                </span>
               )}
               {task.priority === 'high' && <span className="cm-chip hot">⬆ 高优先级</span>}
               {task.is_rework && <span className="cm-chip rw">↩ 重做</span>}
@@ -245,6 +261,28 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                 >
                   {task.description || (isManager ? '点击添加描述…' : '暂无描述')}
                 </div>
+              )}
+            </section>
+
+            <section className="cd-sec">
+              <div className="cd-sec-h">
+                <span className="ic">📅</span>截止时间
+              </div>
+              {isManager ? (
+                <DatePicker
+                  showTime={{ format: 'HH:mm' }}
+                  format="YYYY-MM-DD HH:mm"
+                  placeholder="设置截止时间"
+                  style={{ width: 220 }}
+                  value={task.due_date ? dayjs(task.due_date) : null}
+                  onChange={(d) => saveDue(d ? d.toISOString() : null)}
+                />
+              ) : task.due_date && due ? (
+                <span className={`cm-chip ${due === 'over' ? 'rw' : 'due'}`}>
+                  🕒 {dueLabel(task.due_date)}
+                </span>
+              ) : (
+                <span className="cd-empty">未设置截止时间</span>
               )}
             </section>
 
