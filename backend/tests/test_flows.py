@@ -102,25 +102,38 @@ def test_super_admin_update_user(client, world):
 # --------------------------------------------------------------------------
 
 
-def test_board_visibility_restriction(client, db, world):
-    from app.models import BoardVisibility
-
-    # restrict board to 市场部 only
-    db.add(BoardVisibility(board_id=world["board"].id, department_id=world["mkt"].id))
-    db.commit()
-
-    rnd_admin = auth_header(client, "admin", "pw")
-    boards = client.get("/api/boards", headers=rnd_admin).json()
-    assert all(b["id"] != world["board"].id for b in boards)
-
-    mkt_admin = auth_header(client, "mkt_admin", "pw")
-    boards2 = client.get("/api/boards", headers=mkt_admin).json()
-    assert any(b["id"] == world["board"].id for b in boards2)
-
-    # super_admin always sees it
+def test_board_member_visibility_restriction(client, world):
     sup = auth_header(client, "super", "pw")
-    boards3 = client.get("/api/boards", headers=sup).json()
-    assert any(b["id"] == world["board"].id for b in boards3)
+    bid = world["board"].id
+    # restrict board to member only (via the matrix endpoint)
+    r = client.put(
+        f"/api/boards/{bid}/member-visibility",
+        headers=sup,
+        json={"user_ids": [world["member"].id]},
+    )
+    assert r.status_code == 200
+
+    # member can see it; member2 (not listed) cannot
+    member = auth_header(client, "member", "pw")
+    assert any(b["id"] == bid for b in client.get("/api/boards", headers=member).json())
+    member2 = auth_header(client, "member2", "pw")
+    assert all(b["id"] != bid for b in client.get("/api/boards", headers=member2).json())
+    # super_admin always sees it
+    assert any(b["id"] == bid for b in client.get("/api/boards", headers=sup).json())
+
+    # clearing the allow-list makes it visible to all again
+    client.put(f"/api/boards/{bid}/member-visibility", headers=sup, json={"user_ids": []})
+    assert any(b["id"] == bid for b in client.get("/api/boards", headers=member2).json())
+
+
+def test_visibility_matrix_requires_super(client, world):
+    admin = auth_header(client, "admin", "pw")
+    assert client.get("/api/boards/visibility-matrix", headers=admin).status_code == 403
+    sup = auth_header(client, "super", "pw")
+    m = client.get("/api/boards/visibility-matrix", headers=sup).json()
+    assert "boards" in m and "users" in m and "visibility" in m
+    # users are admins/members only (no super_admin row)
+    assert all(u["role"] in ("admin", "member") for u in m["users"])
 
 
 def test_board_with_no_visibility_is_global(client, world):

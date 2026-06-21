@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Button,
+  Checkbox,
   Form,
   Input,
   Modal,
   Select,
+  Spin,
   Switch,
   Table,
   Tabs,
@@ -17,6 +19,8 @@ import {
   createUser,
   getAdminUsers,
   getDepartments,
+  getVisibilityMatrix,
+  setBoardMemberVisibility,
   updateUser,
 } from '../api/endpoints'
 import { errMessage } from '../api/client'
@@ -201,6 +205,78 @@ function UsersTab() {
   )
 }
 
+function VisibilityTab() {
+  const qc = useQueryClient()
+  const { message } = AntApp.useApp()
+  const { data, isLoading } = useQuery({
+    queryKey: ['visibility-matrix'],
+    queryFn: getVisibilityMatrix,
+  })
+
+  const setM = useMutation({
+    mutationFn: ({ boardId, userIds }: { boardId: number; userIds: number[] }) =>
+      setBoardMemberVisibility(boardId, userIds),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['visibility-matrix'] }),
+    onError: (e) => message.error(errMessage(e)),
+  })
+
+  if (isLoading || !data) return <Spin />
+  const { boards, users, visibility } = data
+  const allUserIds = users.map((u) => u.id)
+
+  // unrestricted (no rows) => visible to all => every box checked
+  const isChecked = (boardId: number, userId: number) =>
+    visibility[boardId] === undefined || visibility[boardId].includes(userId)
+
+  const toggle = (boardId: number, userId: number, checked: boolean) => {
+    const current =
+      visibility[boardId] === undefined ? new Set(allUserIds) : new Set(visibility[boardId])
+    if (checked) current.add(userId)
+    else current.delete(userId)
+    // all checked => store empty (unrestricted); else explicit allow-list
+    const userIds = current.size === allUserIds.length ? [] : [...current]
+    setM.mutate({ boardId, userIds })
+  }
+
+  return (
+    <div>
+      <Typography.Paragraph type="secondary" style={{ marginBottom: 14 }}>
+        勾选 = 该人员可见此看板；取消勾选则不可见。某看板全部勾选 = 对所有人可见（默认）。super_admin 始终可见全部，不在表内。
+      </Typography.Paragraph>
+      <Table
+        rowKey="id"
+        pagination={false}
+        scroll={{ x: true }}
+        dataSource={users}
+        columns={[
+          {
+            title: '人员',
+            key: 'user',
+            fixed: 'left',
+            render: (_: unknown, u: (typeof users)[number]) => (
+              <span>
+                {u.full_name} <span style={{ color: 'var(--subtle)' }}>· {u.role}</span>
+              </span>
+            ),
+          },
+          ...boards.map((b) => ({
+            title: `📋 ${b.name}`,
+            key: `board-${b.id}`,
+            align: 'center' as const,
+            render: (_: unknown, u: (typeof users)[number]) => (
+              <Checkbox
+                checked={isChecked(b.id, u.id)}
+                disabled={setM.isPending}
+                onChange={(e) => toggle(b.id, u.id, e.target.checked)}
+              />
+            ),
+          })),
+        ]}
+      />
+    </div>
+  )
+}
+
 export function AdminPage() {
   return (
     <div className="page-pad">
@@ -209,6 +285,7 @@ export function AdminPage() {
         items={[
           { key: 'users', label: '用户', children: <UsersTab /> },
           { key: 'departments', label: '部门', children: <DepartmentsTab /> },
+          { key: 'visibility', label: '看板可见性', children: <VisibilityTab /> },
         ]}
       />
     </div>

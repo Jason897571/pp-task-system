@@ -42,6 +42,13 @@ export interface Board {
   position: number
 }
 
+export interface VisibilityMatrix {
+  boards: { id: number; name: string }[]
+  users: { id: number; full_name: string; role: Role; department_id: number | null }[]
+  // board_id -> allowed user ids; a board absent from the map = visible to all
+  visibility: Record<number, number[]>
+}
+
 export interface BoardColumn {
   id: number
   board_id: number

@@ -17,6 +17,7 @@ import type {
   AdminUser,
   UpdateUserBody,
   User,
+  VisibilityMatrix,
   Tag,
   TagColor,
   Checklist,
@@ -50,6 +51,14 @@ export const deleteBoard = (id: number) =>
 
 export const reorderBoards = (board_ids: number[]) =>
   api.put<{ ok: boolean }>('/boards/reorder', { board_ids }).then((r) => r.data)
+
+export const getVisibilityMatrix = () =>
+  api.get<VisibilityMatrix>('/boards/visibility-matrix').then((r) => r.data)
+
+export const setBoardMemberVisibility = (boardId: number, user_ids: number[]) =>
+  api
+    .put<{ ok: boolean }>(`/boards/${boardId}/member-visibility`, { user_ids })
+    .then((r) => r.data)
 
 export const getColumns = (boardId: number) =>
   api.get<BoardColumn[]>(`/boards/${boardId}/columns`).then((r) => r.data)

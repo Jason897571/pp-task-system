@@ -83,6 +83,16 @@ class BoardVisibility(Base):
     )
 
 
+class BoardMemberVisibility(Base):
+    """Per-user board visibility. A board with no rows = visible to everyone;
+    once it has rows, only the listed users (and super_admin) may see it."""
+
+    __tablename__ = "board_member_visibility"
+
+    board_id: Mapped[int] = mapped_column(ForeignKey("boards.id"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+
+
 class Task(Base):
     __tablename__ = "tasks"
 

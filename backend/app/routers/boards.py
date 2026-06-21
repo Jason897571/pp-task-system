@@ -8,6 +8,7 @@ from app.models import (
     Attachment,
     Board,
     BoardColumn,
+    BoardMemberVisibility,
     BoardVisibility,
     Checklist,
     ChecklistItem,
@@ -22,6 +23,7 @@ from app.models import (
 from app.schemas import (
     BoardColumnOut,
     BoardIn,
+    BoardMemberVisibilityIn,
     BoardOut,
     BoardReorderIn,
     ColumnIn,
@@ -85,6 +87,62 @@ def reorder_boards(
     return {"ok": True}
 
 
+@router.get("/boards/visibility-matrix")
+def visibility_matrix(
+    user: User = Depends(require_super_admin), db: Session = Depends(get_db)
+):
+    """Board × user visibility for the 管理 matrix. `visibility[board_id]` is the
+    explicit allow-list of user ids; a board absent from it = visible to all."""
+    boards = db.scalars(select(Board).order_by(Board.position, Board.id)).all()
+    users = db.scalars(
+        select(User)
+        .where(
+            User.role.in_(("admin", "member")),
+            User.is_active.is_(True),
+            User.account_status == "active",
+        )
+        .order_by(User.full_name)
+    ).all()
+    vis: dict[int, list[int]] = {}
+    for bid, uid in db.execute(
+        select(BoardMemberVisibility.board_id, BoardMemberVisibility.user_id)
+    ).all():
+        vis.setdefault(bid, []).append(uid)
+    return {
+        "boards": [{"id": b.id, "name": b.name} for b in boards],
+        "users": [
+            {
+                "id": u.id,
+                "full_name": u.full_name,
+                "role": u.role,
+                "department_id": u.department_id,
+            }
+            for u in users
+        ],
+        "visibility": vis,
+    }
+
+
+@router.put("/boards/{board_id}/member-visibility")
+def set_member_visibility(
+    board_id: int,
+    body: BoardMemberVisibilityIn,
+    user: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Replace a board's per-user allow-list. Empty list = visible to everyone."""
+    if db.get(Board, board_id) is None:
+        raise HTTPException(status_code=404, detail="看板不存在")
+    db.execute(
+        delete(BoardMemberVisibility).where(BoardMemberVisibility.board_id == board_id)
+    )
+    for uid in dict.fromkeys(body.user_ids):  # de-dupe, keep order
+        if db.get(User, uid) is not None:
+            db.add(BoardMemberVisibility(board_id=board_id, user_id=uid))
+    db.commit()
+    return {"ok": True}
+
+
 @router.delete("/boards/{board_id}")
 def delete_board(
     board_id: int,
@@ -122,6 +180,9 @@ def delete_board(
         db.execute(delete(Task).where(Task.board_id == board_id))
 
     db.execute(delete(BoardVisibility).where(BoardVisibility.board_id == board_id))
+    db.execute(
+        delete(BoardMemberVisibility).where(BoardMemberVisibility.board_id == board_id)
+    )
     db.execute(delete(BoardColumn).where(BoardColumn.board_id == board_id))
     db.delete(board)
     db.commit()

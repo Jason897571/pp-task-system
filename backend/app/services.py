@@ -9,7 +9,7 @@ from app.models import (
     Attachment,
     Board,
     BoardColumn,
-    BoardVisibility,
+    BoardMemberVisibility,
     Checklist,
     ChecklistItem,
     Notification,
@@ -24,8 +24,8 @@ def visible_board_ids(db: Session, user: User) -> set[int] | None:
     """Board ids the user may see.
 
     Returns None to mean "all boards" (super_admin). For admin/member, a board
-    is visible if it has no BoardVisibility rows (visible to all) OR a row for
-    the user's department.
+    is visible if it has no BoardMemberVisibility rows (visible to all) OR a row
+    for this user (per-user visibility matrix in 管理).
     """
     if user.role == "super_admin":
         return None
@@ -35,22 +35,21 @@ def visible_board_ids(db: Session, user: User) -> set[int] | None:
     all_board_ids |= set(db.scalars(select(Board.id)).all())
 
     restricted = {
-        bid for (bid,) in db.execute(select(BoardVisibility.board_id).distinct()).all()
+        bid
+        for (bid,) in db.execute(select(BoardMemberVisibility.board_id).distinct()).all()
     }
-    dept_boards = set()
-    if user.department_id is not None:
-        dept_boards = {
-            bid
-            for (bid,) in db.execute(
-                select(BoardVisibility.board_id).where(
-                    BoardVisibility.department_id == user.department_id
-                )
-            ).all()
-        }
+    user_boards = {
+        bid
+        for (bid,) in db.execute(
+            select(BoardMemberVisibility.board_id).where(
+                BoardMemberVisibility.user_id == user.id
+            )
+        ).all()
+    }
 
     visible = set()
     for bid in all_board_ids:
-        if bid not in restricted or bid in dept_boards:
+        if bid not in restricted or bid in user_boards:
             visible.add(bid)
     return visible
 

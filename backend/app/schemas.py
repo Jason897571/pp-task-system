@@ -201,6 +201,11 @@ class BoardReorderIn(BaseModel):
     board_ids: list[int]
 
 
+class BoardMemberVisibilityIn(BaseModel):
+    # explicit allow-list of user ids; empty => visible to everyone
+    user_ids: list[int]
+
+
 class ColumnIn(BaseModel):
     name: str
     kind: str | None = None
