@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Button, Input, Modal, Select, App as AntApp } from 'antd'
+import { Button, Input, Modal, Select, Upload, App as AntApp } from 'antd'
+import type { UploadFile } from 'antd'
 import type { TaskDetail, User } from '../api/types'
 import { visibleActions } from '../lib/actions'
 import type { ActionKey } from '../lib/actions'
@@ -12,7 +13,7 @@ interface Props {
   assignableUsers?: User[]
   busy?: boolean
   onStart: () => void
-  onSubmit: (note: string) => void
+  onSubmit: (note: string, files: File[]) => void
   onApply: () => void
   onReview: (approve: boolean, comment?: string) => void
   onApprove: (approve: boolean, assigneeId?: number) => void
@@ -37,6 +38,7 @@ export function CardActions(props: Props) {
 
   const [submitOpen, setSubmitOpen] = useState(false)
   const [submitNote, setSubmitNote] = useState('')
+  const [submitFiles, setSubmitFiles] = useState<UploadFile[]>([])
   const [reviewRejectOpen, setReviewRejectOpen] = useState(false)
   const [reviewComment, setReviewComment] = useState('')
   const [assignTarget, setAssignTarget] = useState<number | undefined>()
@@ -149,9 +151,11 @@ export function CardActions(props: Props) {
         confirmLoading={busy}
         onCancel={() => setSubmitOpen(false)}
         onOk={() => {
-          props.onSubmit(submitNote)
+          const files = submitFiles.map((f) => f.originFileObj as File).filter(Boolean)
+          props.onSubmit(submitNote, files)
           setSubmitOpen(false)
           setSubmitNote('')
+          setSubmitFiles([])
         }}
       >
         <Input.TextArea
@@ -160,6 +164,17 @@ export function CardActions(props: Props) {
           value={submitNote}
           onChange={(e) => setSubmitNote(e.target.value)}
         />
+        <Upload
+          style={{ marginTop: 10 }}
+          fileList={submitFiles}
+          beforeUpload={() => false} // collect locally; upload happens after submit
+          onChange={({ fileList }) => setSubmitFiles(fileList)}
+          multiple
+        >
+          <Button size="small" style={{ marginTop: 10 }}>
+            📎 添加附件
+          </Button>
+        </Upload>
       </Modal>
 
       <Modal

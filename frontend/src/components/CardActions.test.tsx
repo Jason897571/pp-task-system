@@ -23,8 +23,12 @@ function makeTask(over: Partial<TaskDetail>): TaskDetail {
     due_date: null,
     created_at: '',
     updated_at: '',
+    tags: [],
+    checklist_stats: { done: 0, total: 0 },
     deliverables: [],
     applications: [],
+    checklists: [],
+    attachments: [],
     ...over,
   }
 }

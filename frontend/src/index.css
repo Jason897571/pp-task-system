@@ -310,3 +310,161 @@ body {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ---- Card tags (front) ---- */
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.card-tag {
+  height: 16px;
+  min-width: 36px;
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1d2125;
+  line-height: 16px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.badge.checklist {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #ffffff14;
+}
+.badge.checklist.done {
+  background: #1c3a2c;
+  color: #7ee2b8;
+}
+
+/* ---- Tag chips (modal) ---- */
+.tag-chip {
+  height: 22px;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d2125;
+  line-height: 22px;
+  cursor: pointer;
+}
+.tag-row {
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d2125;
+  cursor: pointer;
+}
+.tag-row.on {
+  outline: 2px solid #fff;
+}
+
+/* ---- Notifications ---- */
+.notif-bell {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+}
+.notif-panel {
+  width: 320px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px #00000088;
+  overflow: hidden;
+}
+.notif-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-weight: 600;
+  color: var(--heading);
+  border-bottom: 1px solid var(--line);
+}
+.notif-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+.notif-item {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.notif-item:hover {
+  background: var(--card-hover);
+}
+.notif-item.unread {
+  background: #579dff1a;
+}
+.notif-item.unread .notif-msg {
+  color: var(--heading);
+  font-weight: 600;
+}
+.notif-msg {
+  font-size: 13px;
+  color: var(--text);
+}
+.notif-time {
+  font-size: 11px;
+  color: var(--subtle);
+  margin-top: 2px;
+}
+
+/* ---- Pool bubble view ---- */
+.bubble-field {
+  position: relative;
+  width: 100%;
+  height: 70vh;
+  overflow: hidden;
+  border-radius: 12px;
+}
+.bubble {
+  position: absolute;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 10px;
+  cursor: pointer;
+  color: #fff;
+  background: radial-gradient(circle at 30% 30%, #6fb1ff, #3a72c4);
+  box-shadow: 0 6px 20px #00000055, inset 0 0 20px #ffffff33;
+  animation-name: drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+.bubble:hover {
+  filter: brightness(1.15);
+}
+.bubble-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.bubble-tag {
+  font-size: 11px;
+  margin-top: 4px;
+  opacity: 0.9;
+}
+@keyframes drift {
+  0% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(24px, -28px);
+  }
+  100% {
+    transform: translate(-18px, 20px);
+  }
+}

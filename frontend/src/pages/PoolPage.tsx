@@ -1,15 +1,24 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Empty, Select, Spin, Table, Tag } from 'antd'
+import { Empty, Segmented, Select, Spin, Table, Tag } from 'antd'
 import { getBoards, getColumns, getPool } from '../api/endpoints'
 import { CardDetailModal } from '../components/CardDetailModal'
+import { PoolBubbles } from '../components/PoolBubbles'
 import type { Task } from '../api/types'
 
-// Task Pool — list view only (floating-bubble view is deferred, spec §6b).
+type PoolView = 'list' | 'bubble'
+const VIEW_KEY = 'pool_view'
+
+function loadView(): PoolView {
+  return localStorage.getItem(VIEW_KEY) === 'bubble' ? 'bubble' : 'list'
+}
+
+// Task Pool — list view + floating-bubble view (spec §6b), choice persisted in localStorage.
 export function PoolPage() {
   const { data: boards = [] } = useQuery({ queryKey: ['boards'], queryFn: getBoards })
   const [boardId, setBoardId] = useState<number | undefined>()
   const [openTaskId, setOpenTaskId] = useState<number | null>(null)
+  const [view, setView] = useState<PoolView>(loadView)
 
   const effectiveBoardId = boardId ?? boards[0]?.id
 
@@ -19,13 +28,16 @@ export function PoolPage() {
     enabled: !!effectiveBoardId,
   })
 
-  // Columns needed by the modal to resolve column kind (pool tasks have none, but
-  // the modal reads from this list defensively).
   const { data: columns = [] } = useQuery({
     queryKey: ['columns', effectiveBoardId],
     queryFn: () => getColumns(effectiveBoardId!),
     enabled: !!effectiveBoardId,
   })
+
+  const changeView = (v: PoolView) => {
+    setView(v)
+    localStorage.setItem(VIEW_KEY, v)
+  }
 
   const columnsDef = [
     { title: '标题', dataIndex: 'title', key: 'title' },
@@ -60,12 +72,22 @@ export function PoolPage() {
           onChange={setBoardId}
           options={boards.map((b) => ({ value: b.id, label: b.name }))}
         />
+        <Segmented
+          value={view}
+          onChange={(v) => changeView(v as PoolView)}
+          options={[
+            { value: 'list', label: '列表' },
+            { value: 'bubble', label: '气泡' },
+          ]}
+        />
       </div>
 
       {isLoading ? (
         <Spin />
       ) : pool.length === 0 ? (
         <Empty description="任务池为空" />
+      ) : view === 'bubble' ? (
+        <PoolBubbles tasks={pool} onOpen={setOpenTaskId} />
       ) : (
         <Table
           rowKey="id"

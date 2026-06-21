@@ -1,7 +1,8 @@
 import type { ColumnKind, Task } from '../api/types'
-import { avatarColor, dueLabel, dueState, initial } from '../lib/badges'
+import { avatarColor, dueLabel, dueState, initial, TAG_COLORS } from '../lib/badges'
 
-// Card front per spec §7.3: title, priority badge, due badge, rework badge, assignee avatar.
+// Card front per spec §7.3: colored tag bars, checklist progress, attachment count,
+// mandatory / rework / priority / description badges, due badge, assignee avatar.
 export function CardFront({ task, columnKind }: { task: Task; columnKind: ColumnKind }) {
   const due = dueState(task.due_date, columnKind)
   const badges: React.ReactNode[] = []
@@ -10,6 +11,16 @@ export function CardFront({ task, columnKind }: { task: Task; columnKind: Column
     badges.push(
       <span key="due" className={`badge due ${due}`}>
         🕒 {dueLabel(task.due_date)}
+      </span>,
+    )
+  }
+  // Checklist progress (green when fully done & non-empty).
+  const cs = task.checklist_stats
+  if (cs && cs.total > 0) {
+    const allDone = cs.done === cs.total
+    badges.push(
+      <span key="checklist" className={`badge checklist ${allDone ? 'done' : ''}`}>
+        ☑ {cs.done}/{cs.total}
       </span>,
     )
   }
@@ -44,6 +55,20 @@ export function CardFront({ task, columnKind }: { task: Task; columnKind: Column
 
   return (
     <>
+      {task.tags.length > 0 && (
+        <div className="card-tags">
+          {task.tags.map((t) => (
+            <span
+              key={t.id}
+              className="card-tag"
+              style={{ background: TAG_COLORS[t.color] }}
+              title={t.name}
+            >
+              {t.name}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="card-title">{task.title}</div>
       {badges.length > 0 && <div className="badges">{badges}</div>}
       {task.assignee && (

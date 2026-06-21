@@ -9,11 +9,15 @@ import {
   reviewTask,
   startTask,
   submitTask,
+  uploadFile,
 } from '../api/endpoints'
 import { errMessage } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import type { BoardColumn, User } from '../api/types'
 import { CardActions } from './CardActions'
+import { TagsSection } from './TagsSection'
+import { ChecklistsSection } from './ChecklistsSection'
+import { AttachmentsSection, AttachmentList } from './AttachmentsSection'
 import { avatarColor, dueLabel, initial } from '../lib/badges'
 
 interface Props {
@@ -54,7 +58,24 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
       .catch((e) => message.error(errMessage(e)))
 
   const startM = useMutation({ mutationFn: () => startTask(taskId) })
-  const submitM = useMutation({ mutationFn: (note: string) => submitTask(taskId, note) })
+  // Submit a deliverable, then (if files were attached) upload them against the
+  // newest deliverable. Contract's submit returns Task (no deliverable id), so we
+  // re-fetch detail and target the most recent deliverable.
+  const submitM = useMutation({
+    mutationFn: async ({ note, files }: { note: string; files: File[] }) => {
+      await submitTask(taskId, note)
+      if (files.length > 0) {
+        const detail = await getTask(taskId)
+        const latest = detail.deliverables.reduce<number | null>(
+          (max, d) => (max === null || d.id > max ? d.id : max),
+          null,
+        )
+        if (latest !== null) {
+          for (const f of files) await uploadFile(f, 'deliverable', latest)
+        }
+      }
+    },
+  })
   const applyM = useMutation({ mutationFn: () => applyTask(taskId) })
   const reviewM = useMutation({
     mutationFn: (b: { approve: boolean; comment?: string }) => reviewTask(taskId, b),
@@ -74,6 +95,14 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
 
   const column = task ? columns.find((c) => c.id === task.column_id) ?? null : null
   const columnKind = column?.kind ?? null
+
+  // Edit permission for tags/checklists/attachments: admin/super_admin or assignee.
+  const canEdit =
+    !!task &&
+    !!user &&
+    (user.role === 'admin' ||
+      user.role === 'super_admin' ||
+      task.assignee?.id === user.id)
 
   return (
     <Modal open width={768} footer={null} onCancel={onClose} title={null}>
@@ -114,6 +143,27 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
               </section>
             )}
 
+            <TagsSection
+              taskId={task.id}
+              tags={task.tags}
+              canEdit={canEdit}
+              onChanged={invalidate}
+            />
+
+            <ChecklistsSection
+              taskId={task.id}
+              checklists={task.checklists}
+              canEdit={canEdit}
+              onChanged={invalidate}
+            />
+
+            <AttachmentsSection
+              taskId={task.id}
+              attachments={task.attachments}
+              canEdit={canEdit}
+              onChanged={invalidate}
+            />
+
             <section style={{ marginTop: 18 }}>
               <h4>📦 产出历史</h4>
               {task.deliverables.length === 0 ? (
@@ -130,6 +180,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                     }}
                   >
                     <b>{d.submitter.full_name}</b> · {d.note}
+                    <AttachmentList attachments={d.attachments} />
                   </div>
                 ))
               )}
@@ -169,7 +220,9 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
               assignableUsers={assignableUsers(users, task.applications.map((a) => a.applicant))}
               busy={busy}
               onStart={() => wrap(() => startM.mutateAsync(), '已开始')}
-              onSubmit={(note) => wrap(() => submitM.mutateAsync(note), '已提交产出')}
+              onSubmit={(note, files) =>
+                wrap(() => submitM.mutateAsync({ note, files }), '已提交产出')
+              }
               onApply={() => wrap(() => applyM.mutateAsync(), '已申请')}
               onReview={(approve, comment) =>
                 wrap(() => reviewM.mutateAsync({ approve, comment }), approve ? '已通过' : '已打回')
