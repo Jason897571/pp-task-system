@@ -151,3 +151,118 @@ GET  /api/tasks/{id}/applications   [admin]             -> 200 [ {…application
 - member（研发部）：`username=member / password=member123`
 - 默认「任务看板」：列 `待办(start)` → `进行中(doing)` → `待审核(review)` → `已完成(done)`
 - 若干处于不同列的任务 + 2~3 个任务池(open)任务
+
+---
+
+# 第二轮：延后功能接口（标签 / 清单 / 每周必做 / 文件 / 通知 / 统计 / 气泡池）
+
+模型已在第一轮建好（spec §4）。本轮加端点 + 前端。沿用第一轮的错误格式、JWT、显示名(full_name)规则。
+
+## Task / TaskDetail 形状增补（前后端共同遵守）
+
+第一轮的 `Task`（卡片正面用）**新增**两个字段，后端所有返回 Task 的地方都要带上：
+
+```jsonc
+{
+  // …第一轮字段不变…
+  "tags": [ { "id": 1, "name": "紧急", "color": "red" } ],   // 该卡的彩色标签，无则 []
+  "checklist_stats": { "done": 2, "total": 5 }               // 清单进度；无清单则 {done:0,total:0}
+}
+```
+
+`TaskDetail` 在第一轮基础上**再新增**：
+
+```jsonc
+{
+  // …Task 全部字段 + 第一轮的 deliverables / applications…
+  "checklists": [
+    { "id": 1, "title": "上线前检查", "position": 0,
+      "items": [ { "id": 1, "content": "跑测试", "is_done": true, "position": 0 } ] }
+  ],
+  "attachments": [
+    { "id": 1, "owner_type": "task", "owner_id": 100, "filename": "spec.pdf",
+      "filesize": 12345, "content_type": "application/pdf", "uploader": {…User}, "created_at": "…" }
+  ]
+}
+```
+
+产出 Deliverable 也增补 `attachments`（owner_type=deliverable）：
+```jsonc
+{ "id": 1, "submitter": {…User}, "note": "…", "created_at": "…",
+  "attachments": [ {…Attachment} ] }
+```
+
+## 标签（彩色 Label）
+色板取值（color 字段用这些 key）：`green yellow orange red purple blue sky pink gray`。
+
+```
+GET  /api/tags                       -> 200 [ { "id", "name", "color" } ]
+POST /api/tags                       body: { "name": "紧急", "color": "red" } -> 200 {…Tag}   [任意登录用户]
+PUT  /api/tasks/{id}/tags            body: { "tag_ids": [1,2] }  // 全量覆盖该卡标签
+                                     -> 200 [ {…Tag} ]                       [admin / 任务负责人]
+```
+
+## 清单（Checklist）
+```
+POST   /api/tasks/{id}/checklists        body: { "title": "上线检查" } -> 200 {…Checklist(含空 items)}
+PUT    /api/checklists/{cid}             body: { "title"?, "position"? } -> 200 {…Checklist}
+DELETE /api/checklists/{cid}             -> 200 { "ok": true }
+POST   /api/checklists/{cid}/items       body: { "content": "跑测试" } -> 200 {…ChecklistItem}
+PUT    /api/checklist-items/{iid}        body: { "is_done"?, "content"?, "position"? } -> 200 {…ChecklistItem}
+DELETE /api/checklist-items/{iid}        -> 200 { "ok": true }
+```
+权限：能编辑该任务的人（admin 或负责人）。
+
+## 每周必做（Recurring，admin / super_admin）
+```
+GET    /api/recurring-tasks   -> 200 [ { "id","title","description","priority",
+                                        "day_of_week","is_active",
+                                        "assignees":[{…User}] } ]
+POST   /api/recurring-tasks   body: { "title","description"?,"priority"?,
+                                      "day_of_week"?(0=周一…6=周日,默认0),
+                                      "assignee_ids":[int] } -> 200 {…RecurringTask}
+PUT    /api/recurring-tasks/{id}  body: { 任意上述字段 + "is_active"? } -> 200 {…RecurringTask}
+DELETE /api/recurring-tasks/{id}  -> 200 { "ok": true }
+POST   /api/recurring-tasks/{id}/run-now  -> 200 { "created": n }   // 立即按模板生成本周实例（运维/测试用）
+```
+- **自动生成**：APScheduler 每天检查；当天 = `day_of_week` 时，为每个指派人各生成一个 Task：
+  `is_mandatory=true`、`recurring_task_id` 指向模板、落「任务看板」`start` 列、`lifecycle=on_board`、**截止固定本周五 18:00**。
+- 生成逻辑抽成纯函数 `generate_recurring_instances(db, today)` 便于单测；`run-now` 与 scheduler 都调它。
+- admin 只能给本部门成员设；super_admin 全局。
+
+## 文件（本地磁盘）
+```
+POST /api/files/upload    multipart/form-data: file=<二进制>, owner_type=task|deliverable, owner_id=<int>
+                          -> 200 {…Attachment}     [对该 owner 有编辑权的人；单文件 ≤50MB；类型白名单]
+GET  /api/files/{id}      -> 200 二进制下载(Content-Disposition)   [仅任务相关人，否则 403]
+```
+存储路径 `./uploads/{year}/{uuid}-{filename}`，DB 存元信息。
+
+## 通知（站内 + 轮询）
+```
+GET  /api/notifications              -> 200 [ { "id","type","message","related_task_id",
+                                               "is_read","created_at" } ]  // 倒序，最近 N 条
+POST /api/notifications/{id}/read    -> 200 { "ok": true }
+POST /api/notifications/read-all     -> 200 { "ok": true }
+```
+后端在这些事件写通知给相应用户：被指派(→负责人)、池任务被申请(→本部门 admin)、产出提交(→可审核的 admin)、审核通过/打回(→负责人)。前端每 30s 轮询，顶栏铃铛显示未读数（= is_read=false 计数）。
+
+## 统计（admin / super_admin）
+```
+GET /api/stats/overview?board_id=   -> 200 {
+  "by_column": [ { "column_id","name","count" } ],   // 当前看板各列任务数
+  "pool_count": n,                                    // 该看板任务池数
+  "overdue_count": n                                  // 逾期(due_date<now 且未完成)数
+}
+GET /api/stats/members              -> 200 [ {
+  "user": {…User}, "total","done","in_review","overdue" } ]
+```
+权限：super_admin 全局；admin 本部门。基于 Task 实时聚合，不建新表。
+
+## 前端（本轮新增/改造）
+- **卡片正面**：顶部彩色标签条；清单进度徽章 `☑ 2/5`(全完成变绿)；📎 附件数；🔁 必做徽章；📝 有描述。
+- **卡片详情 Modal**：新增 **标签**(选色板/新建/切换)、**清单**(多清单+进度条+勾选+增删项+改名)、**附件**(上传/列表/下载，产出提交可带附件) 三个区块。
+- **每周必做管理页** `/recurring`(admin/super)：列表 + 新建(标题/描述/优先级/星期几/指派人) + 启停 + 删除。
+- **统计面板页** `/stats`(admin/super)：概览卡片+图表(切看板随之变) + 人员表格(点人名筛其任务，弹任务详情)。
+- **通知**：顶栏铃铛 + 每 30s 轮询未读数 + 下拉通知列表 + 标记已读。
+- **任务池气泡视图**：列表/气泡一键切换(localStorage 记忆)；气泡 CSS 缓慢漂浮，大小/亮度按 priority(越紧急越显眼)，分派后破裂飞走。
