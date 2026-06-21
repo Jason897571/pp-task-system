@@ -4,13 +4,28 @@ import { avatarColor, dueLabel, dueState, initial, PRIORITY_LABEL } from '../lib
 // Card front (spec §7.3). Layout: colored label pills → title → hairline
 // divider → meta row (status chips on the left, assignee avatar on the right).
 // A red left spine (drawn on .card via data-spine) flags high-priority cards.
-export function CardFront({ task, columnKind }: { task: Task; columnKind: ColumnKind }) {
+export function CardFront({
+  task,
+  columnKind,
+  isFinal = false,
+}: {
+  task: Task
+  columnKind: ColumnKind
+  isFinal?: boolean
+}) {
   const due = dueState(task.due_date, columnKind)
   const cs = task.checklist_stats
   const hasChecklist = !!cs && cs.total > 0
   const checklistDone = hasChecklist && cs.done === cs.total
 
   const chips: React.ReactNode[] = []
+  if (isFinal) {
+    chips.push(
+      <span key="done" className="mchip done">
+        ✓ 已完成
+      </span>,
+    )
+  }
   chips.push(
     <span key="prio" className={`mchip prio-${task.priority}`}>
       {PRIORITY_LABEL[task.priority] ?? 'P1'}

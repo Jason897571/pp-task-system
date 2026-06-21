@@ -40,6 +40,7 @@ export interface Board {
   id: number
   name: string
   position: number
+  is_archive: boolean
 }
 
 export interface VisibilityMatrix {
@@ -55,6 +56,7 @@ export interface BoardColumn {
   name: string
   position: number
   kind: ColumnKind
+  is_final: boolean
 }
 
 // Round-2: 9-color label palette (color field uses these keys).

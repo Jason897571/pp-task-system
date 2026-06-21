@@ -10,11 +10,13 @@ function DraggableCard({
   col,
   me,
   onOpen,
+  onRestore,
 }: {
   task: Task
   col: Col
   me: Pick<User, 'id' | 'role'>
   onOpen: (id: number) => void
+  onRestore?: (task: Task) => void
 }) {
   const draggable = canDrag(task, me)
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -26,12 +28,24 @@ function DraggableCard({
   return (
     <div
       ref={setNodeRef}
-      className={`card ${isDragging ? 'dragging' : ''}`}
+      className={`card ${isDragging ? 'dragging' : ''} ${col.is_final ? 'card-done' : ''}`}
       data-spine={task.priority === 'high' ? 'high' : undefined}
       onClick={() => onOpen(task.id)}
       {...(draggable ? { ...listeners, ...attributes } : {})}
     >
-      <CardFront task={task} columnKind={col.kind} />
+      <CardFront task={task} columnKind={col.kind} isFinal={col.is_final} />
+      {onRestore && (
+        <button
+          type="button"
+          className="card-restore"
+          onClick={(e) => {
+            e.stopPropagation()
+            onRestore(task)
+          }}
+        >
+          ↩ 放回看板
+        </button>
+      )}
     </div>
   )
 }
@@ -45,6 +59,8 @@ interface Props {
   onAddCard: (colId: number, title: string) => void
   onRenameColumn: (colId: number, name: string) => void
   onDeleteColumn: (colId: number) => void
+  onSetFinal: (colId: number, isFinal: boolean) => void
+  onRestore?: (task: Task) => void
 }
 
 export function BoardColumnView({
@@ -56,6 +72,8 @@ export function BoardColumnView({
   onAddCard,
   onRenameColumn,
   onDeleteColumn,
+  onSetFinal,
+  onRestore,
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id, data: { col } })
   const [adding, setAdding] = useState(false)
@@ -95,6 +113,11 @@ export function BoardColumnView({
         ) : (
           <>
             <span>{col.name}</span>
+            {col.is_final && (
+              <span className="col-final-tag" title="最终验收完成列：卡片视为完成，周六自动归档">
+                ✓ 最终验收
+              </span>
+            )}
             <span className="count">{tasks.length}</span>
             <span className="lspacer" />
             {isSuperAdmin && (
@@ -103,6 +126,11 @@ export function BoardColumnView({
                 menu={{
                   items: [
                     { key: 'rename', label: '改列名', onClick: () => setRenaming(true) },
+                    {
+                      key: 'final',
+                      label: col.is_final ? '取消最终验收' : '设为最终验收完成',
+                      onClick: () => onSetFinal(col.id, !col.is_final),
+                    },
                     {
                       key: 'delete',
                       label: '删除该列',
@@ -125,7 +153,14 @@ export function BoardColumnView({
 
       <div ref={setNodeRef} className={`cards ${isOver ? 'drag-over' : ''}`}>
         {tasks.map((t) => (
-          <DraggableCard key={t.id} task={t} col={col} me={me} onOpen={onOpenCard} />
+          <DraggableCard
+            key={t.id}
+            task={t}
+            col={col}
+            me={me}
+            onOpen={onOpenCard}
+            onRestore={onRestore}
+          />
         ))}
       </div>
 

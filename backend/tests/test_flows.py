@@ -195,7 +195,8 @@ def test_reorder_boards(client, world):
     desired = [b3["id"], world["board"].id, b2["id"]]
     r = client.put("/api/boards/reorder", headers=sup, json={"board_ids": desired})
     assert r.status_code == 200
-    order = [b["id"] for b in client.get("/api/boards", headers=sup).json()]
+    # Archive board is auto-created and pinned last; compare only normal boards.
+    order = [b["id"] for b in client.get("/api/boards", headers=sup).json() if not b["is_archive"]]
     assert order == desired
     # non-super forbidden
     member = auth_header(client, "member", "pw")
@@ -333,6 +334,72 @@ def test_review_reject_rework(client, world):
     client.post(f"/api/tasks/{t['id']}/submit", headers=member, json={"note": "v2"})
     bad = client.post(f"/api/tasks/{t['id']}/review", headers=admin, json={"approve": False})
     assert bad.status_code == 400
+
+
+# --------------------------------------------------------------------------
+# Final-acceptance column + weekly archive + restore
+# --------------------------------------------------------------------------
+
+
+def test_final_column_archive_and_restore(client, world):
+    sup = auth_header(client, "super", "pw")
+    admin = auth_header(client, "admin", "pw")
+    done = world["cols"]["done"]
+
+    # super marks the 已完成 column as the final-acceptance stage
+    r = client.put(f"/api/columns/{done.id}", headers=sup, json={"is_final": True})
+    assert r.status_code == 200 and r.json()["is_final"] is True
+
+    # a card lands in the final column (admin assigns + drives it through review)
+    member = auth_header(client, "member", "pw")
+    t = _assigned_task(client, world)
+    client.post(f"/api/tasks/{t['id']}/start", headers=member)
+    client.post(f"/api/tasks/{t['id']}/submit", headers=member, json={"note": "done"})
+    client.post(f"/api/tasks/{t['id']}/review", headers=admin, json={"approve": True})
+
+    # run the weekly sweep now
+    r = client.post("/api/boards/archive-now", headers=sup)
+    assert r.status_code == 200 and r.json()["archived"] == 1
+
+    # the card now lives on the archive board
+    boards = client.get("/api/boards", headers=sup).json()
+    archive = next(b for b in boards if b["is_archive"])
+    detail = client.get(f"/api/tasks/{t['id']}", headers=sup).json()
+    assert detail["board_id"] == archive["id"]
+
+    # admin restores it to another board's start column
+    target = world["board"].id
+    start_col = world["cols"]["start"].id
+    r = client.post(
+        f"/api/tasks/{t['id']}/move-to-board",
+        headers=admin,
+        json={"board_id": target, "column_id": start_col},
+    )
+    assert r.status_code == 200
+    assert r.json()["board_id"] == target and r.json()["column_id"] == start_col
+
+
+def test_only_one_final_column_per_board(client, world):
+    sup = auth_header(client, "super", "pw")
+    done = world["cols"]["done"]
+    review = world["cols"]["review"]
+    client.put(f"/api/columns/{done.id}", headers=sup, json={"is_final": True})
+    client.put(f"/api/columns/{review.id}", headers=sup, json={"is_final": True})
+
+    cols = client.get(f"/api/boards/{world['board'].id}/columns", headers=sup).json()
+    finals = [c["id"] for c in cols if c["is_final"]]
+    assert finals == [review.id]  # marking review cleared done
+
+
+def test_member_cannot_restore_archived(client, world):
+    member = auth_header(client, "member", "pw")
+    t = _assigned_task(client, world)
+    r = client.post(
+        f"/api/tasks/{t['id']}/move-to-board",
+        headers=member,
+        json={"board_id": world["board"].id, "column_id": world["cols"]["start"].id},
+    )
+    assert r.status_code == 403
 
 
 def test_review_on_non_review_column_is_409(client, world):

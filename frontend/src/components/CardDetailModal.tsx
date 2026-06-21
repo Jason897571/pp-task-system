@@ -283,63 +283,62 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
               )}
             </section>
 
-            <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-              <section className="cd-sec" style={{ flex: '0 0 auto' }}>
-                <div className="cd-sec-h">
-                  <span className="ic">📅</span>截止时间
-                </div>
-                {isManager ? (
-                  <DatePicker
-                    showTime={{ format: 'HH:mm' }}
-                    format="YYYY-MM-DD HH:mm"
-                    placeholder="设置截止时间"
-                    style={{ width: 220 }}
-                    value={task.due_date ? dayjs(task.due_date) : null}
-                    onChange={(d) => saveDue(d ? d.toISOString() : null)}
-                  />
-                ) : task.due_date && due ? (
-                  <span className={`cm-chip ${due === 'over' ? 'rw' : 'due'}`}>
-                    🕒 {dueLabel(task.due_date)}
-                  </span>
-                ) : (
-                  <span className="cd-empty">未设置截止时间</span>
-                )}
-              </section>
+            {/* 截止时间 / 优先级 are admin-only here — members already see them in
+               the top chips. 需求附件 shows for managers (with upload) or whenever
+               files exist (read-only for members). */}
+            {(isManager || task.attachments.length > 0) && (
+              <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                {isManager && (
+                  <>
+                    <section className="cd-sec" style={{ flex: '0 0 auto' }}>
+                      <div className="cd-sec-h">
+                        <span className="ic">📅</span>截止时间
+                      </div>
+                      <DatePicker
+                        showTime={{ format: 'HH:mm' }}
+                        format="YYYY-MM-DD HH:mm"
+                        placeholder="设置截止时间"
+                        style={{ width: 220 }}
+                        value={task.due_date ? dayjs(task.due_date) : null}
+                        onChange={(d) => saveDue(d ? d.toISOString() : null)}
+                      />
+                    </section>
 
-              <section className="cd-sec" style={{ flex: '0 0 auto' }}>
-                <div className="cd-sec-h">
-                  <span className="ic">⚑</span>优先级
-                </div>
-                {isManager ? (
-                  <Select
-                    value={task.priority}
-                    style={{ width: 90 }}
-                    options={PRIORITY_OPTIONS}
-                    onChange={savePriority}
-                  />
-                ) : (
-                  <span className={`cm-chip ${task.priority === 'high' ? 'hot' : ''}`}>
-                    {PRIORITY_LABEL[task.priority] ?? 'P1'}
-                  </span>
+                    <section className="cd-sec" style={{ flex: '0 0 auto' }}>
+                      <div className="cd-sec-h">
+                        <span className="ic">⚑</span>优先级
+                      </div>
+                      <Select
+                        value={task.priority}
+                        style={{ width: 90 }}
+                        options={PRIORITY_OPTIONS}
+                        onChange={savePriority}
+                      />
+                    </section>
+                  </>
                 )}
-              </section>
 
-              <div style={{ flex: 1, minWidth: 220 }}>
-                <AttachmentsSection
-                  taskId={task.id}
-                  attachments={task.attachments}
-                  canEdit={canEdit}
-                  onChanged={invalidate}
-                />
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <AttachmentsSection
+                    taskId={task.id}
+                    attachments={task.attachments}
+                    canEdit={isManager}
+                    onChanged={invalidate}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            <ChecklistsSection
-              taskId={task.id}
-              checklists={task.checklists}
-              canEdit={canEdit}
-              onChanged={invalidate}
-            />
+            {/* Checklist is part of the requirement definition — managers only. For
+               members it shows read-only when items exist, and is hidden otherwise. */}
+            {(isManager || task.checklists.length > 0) && (
+              <ChecklistsSection
+                taskId={task.id}
+                checklists={task.checklists}
+                canEdit={isManager}
+                onChanged={invalidate}
+              />
+            )}
           </div>
 
           {/* ===================== 流向 ===================== */}

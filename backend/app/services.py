@@ -244,6 +244,8 @@ def serialize_task_detail(db: Session, task: Task):
 # ---------------------------------------------------------------------------
 
 DEFAULT_BOARD_NAME = "任务看板"
+ARCHIVE_BOARD_NAME = "归档看板"
+ARCHIVE_COLUMN_NAME = "已归档"
 
 
 def this_week_friday_1800(today: date) -> datetime:
@@ -329,3 +331,50 @@ def generate_recurring_instances(
             )
             created += 1
     return created
+
+
+# ---------------------------------------------------------------------------
+# Archive: weekly sweep of completed cards into the global archive board
+# ---------------------------------------------------------------------------
+
+
+def get_or_create_archive_board(db: Session) -> Board:
+    """The single global 归档看板. Created on first use with one 已归档 column.
+
+    Visible to everyone (no member-visibility rows). Does not commit."""
+    board = db.scalars(select(Board).where(Board.is_archive.is_(True))).first()
+    if board is None:
+        max_pos = db.scalar(select(func.max(Board.position))) or 0
+        board = Board(name=ARCHIVE_BOARD_NAME, position=max_pos + 1, is_archive=True)
+        db.add(board)
+        db.flush()
+    if not board.columns:
+        db.add(BoardColumn(board_id=board.id, name=ARCHIVE_COLUMN_NAME, position=0))
+        db.flush()
+    return board
+
+
+def archive_completed_tasks(db: Session, today: date | None = None) -> int:
+    """Move every on-board card sitting in an is_final column into the archive
+    board's first column. Returns the number of cards archived. Does not commit."""
+    archive = get_or_create_archive_board(db)
+    target = first_column(db, archive.id)
+    if target is None:
+        return 0
+
+    final_col_ids = set(
+        db.scalars(select(BoardColumn.id).where(BoardColumn.is_final.is_(True))).all()
+    )
+    if not final_col_ids:
+        return 0
+
+    tasks = db.scalars(
+        select(Task).where(
+            Task.column_id.in_(final_col_ids),
+            Task.board_id != archive.id,
+        )
+    ).all()
+    for task in tasks:
+        task.board_id = archive.id
+        task.column_id = target.id
+    return len(tasks)

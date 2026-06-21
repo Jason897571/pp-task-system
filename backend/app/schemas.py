@@ -32,6 +32,7 @@ class BoardOut(BaseModel):
     id: int
     name: str
     position: int
+    is_archive: bool = False
 
 
 class BoardColumnOut(BaseModel):
@@ -42,6 +43,7 @@ class BoardColumnOut(BaseModel):
     name: str
     position: int
     kind: str | None
+    is_final: bool = False
 
 
 class TagOut(BaseModel):
@@ -215,6 +217,7 @@ class ColumnUpdateIn(BaseModel):
     name: str | None = None
     kind: str | None = None
     position: int | None = None
+    is_final: bool | None = None
 
 
 class TaskIn(BaseModel):
@@ -244,6 +247,13 @@ class ApproveIn(BaseModel):
 
 
 class MoveIn(BaseModel):
+    column_id: int
+
+
+class MoveBoardIn(BaseModel):
+    """Cross-board move used to restore an archived card to another board."""
+
+    board_id: int
     column_id: int
 
 

@@ -55,6 +55,8 @@ class Board(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     position: Mapped[int] = mapped_column(Integer, default=0)
+    # The single global archive board that completed cards are swept into weekly.
+    is_archive: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     columns: Mapped[list["BoardColumn"]] = relationship(
@@ -70,6 +72,9 @@ class BoardColumn(Base):
     name: Mapped[str] = mapped_column(String(100))
     position: Mapped[int] = mapped_column(Integer, default=0)
     kind: Mapped[str | None] = mapped_column(String(20), nullable=True)  # start|doing|review|done|null
+    # super_admin marks one column per board as the final acceptance stage. Cards
+    # here count as completed and are auto-archived every Saturday.
+    is_final: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
     board: Mapped[Board] = relationship(back_populates="columns")
 

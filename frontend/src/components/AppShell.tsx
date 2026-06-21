@@ -102,6 +102,10 @@ export function AppShell() {
     reorderM.mutate(next.map((b) => b.id))
   }
 
+  // Archive board is pinned at the bottom, never draggable or deletable.
+  const normalBoards = boards.filter((b) => !b.is_archive)
+  const archiveBoard = boards.find((b) => b.is_archive)
+
   const activeBoardId = (() => {
     const m = location.pathname.match(/^\/board\/(\d+)/)
     return m ? Number(m[1]) : null
@@ -176,10 +180,10 @@ export function AppShell() {
               onDragEnd={onBoardDragEnd}
             >
               <SortableContext
-                items={boards.map((b) => b.id)}
+                items={normalBoards.map((b) => b.id)}
                 strategy={verticalListSortingStrategy}
               >
-                {boards.map((b) => (
+                {normalBoards.map((b) => (
                   <SortableBoardItem
                     key={b.id}
                     board={b}
@@ -191,7 +195,7 @@ export function AppShell() {
               </SortableContext>
             </DndContext>
           ) : (
-            boards.map((b) => (
+            normalBoards.map((b) => (
               <button
                 key={b.id}
                 className={`nav-item ${activeBoardId === b.id ? 'active' : ''}`}
@@ -204,6 +208,14 @@ export function AppShell() {
           {isSuper && (
             <button className="nav-item" onClick={() => setNewBoardOpen(true)}>
               + 新建看板
+            </button>
+          )}
+          {archiveBoard && (
+            <button
+              className={`nav-item ${activeBoardId === archiveBoard.id ? 'active' : ''}`}
+              onClick={() => navigate(`/board/${archiveBoard.id}`)}
+            >
+              🗄️ {archiveBoard.name}
             </button>
           )}
 

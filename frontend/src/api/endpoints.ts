@@ -68,11 +68,14 @@ export const createColumn = (boardId: number, body: { name: string; kind: Column
 
 export const updateColumn = (
   cid: number,
-  body: { name?: string; kind?: ColumnKind; position?: number },
+  body: { name?: string; kind?: ColumnKind; position?: number; is_final?: boolean },
 ) => api.put<BoardColumn>(`/columns/${cid}`, body).then((r) => r.data)
 
 export const deleteColumn = (cid: number) =>
   api.delete<{ ok: boolean }>(`/columns/${cid}`).then((r) => r.data)
+
+export const archiveNow = () =>
+  api.post<{ archived: number }>('/boards/archive-now').then((r) => r.data)
 
 // --- Tasks ---
 export const getTasks = (params: { board_id?: number; assignee?: number; lifecycle?: Lifecycle }) =>
@@ -91,6 +94,9 @@ export const createTask = (body: CreateTaskBody) =>
 
 export const moveTask = (id: number, column_id: number) =>
   api.post<Task>(`/tasks/${id}/move`, { column_id }).then((r) => r.data)
+
+export const moveTaskToBoard = (id: number, board_id: number, column_id: number) =>
+  api.post<Task>(`/tasks/${id}/move-to-board`, { board_id, column_id }).then((r) => r.data)
 
 export const startTask = (id: number) =>
   api.post<Task>(`/tasks/${id}/start`).then((r) => r.data)

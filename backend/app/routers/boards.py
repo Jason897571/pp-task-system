@@ -29,7 +29,13 @@ from app.schemas import (
     ColumnIn,
     ColumnUpdateIn,
 )
-from app.services import board_can_see, first_column, visible_board_ids
+from app.services import (
+    archive_completed_tasks,
+    board_can_see,
+    first_column,
+    get_or_create_archive_board,
+    visible_board_ids,
+)
 
 router = APIRouter(prefix="/api", tags=["boards"])
 
@@ -44,8 +50,12 @@ DEFAULT_COLUMNS = [
 
 @router.get("/boards", response_model=list[BoardOut])
 def list_boards(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Ensure the global archive board exists so it always shows in the sidebar.
+    get_or_create_archive_board(db)
+    db.commit()
     ids = visible_board_ids(db, user)
-    stmt = select(Board).order_by(Board.position, Board.id)
+    # Archive board is always pinned last, regardless of its stored position.
+    stmt = select(Board).order_by(Board.is_archive, Board.position, Board.id)
     if ids is not None:
         stmt = stmt.where(Board.id.in_(ids))
     rows = db.scalars(stmt).all()
@@ -247,6 +257,14 @@ def update_column(
         col.kind = body.kind
     if body.position is not None:
         col.position = body.position
+    if body.is_final is not None:
+        if body.is_final:
+            # At most one final column per board — clear the flag on siblings.
+            for sibling in db.scalars(
+                select(BoardColumn).where(BoardColumn.board_id == col.board_id)
+            ).all():
+                sibling.is_final = False
+        col.is_final = body.is_final
     db.commit()
     db.refresh(col)
     return BoardColumnOut.model_validate(col)
@@ -278,3 +296,14 @@ def delete_column(
     db.delete(col)
     db.commit()
     return {"ok": True}
+
+
+@router.post("/boards/archive-now")
+def archive_now(
+    user: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Run the weekly archive sweep immediately (super_admin)."""
+    count = archive_completed_tasks(db)
+    db.commit()
+    return {"archived": count}

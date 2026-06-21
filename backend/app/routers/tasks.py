@@ -14,6 +14,7 @@ from app.models import (
 from app.schemas import (
     ApproveIn,
     AssignIn,
+    MoveBoardIn,
     MoveIn,
     ReviewIn,
     SubmitIn,
@@ -297,6 +298,36 @@ def move_task(
     elif not admin_can_touch_task(user, task):
         raise HTTPException(status_code=403, detail="无权移动该任务")
 
+    task.column_id = col.id
+    db.commit()
+    db.refresh(task)
+    return serialize_task(db, task)
+
+
+@router.post("/tasks/{task_id}/move-to-board", response_model=TaskOut)
+def move_task_to_board(
+    task_id: int,
+    body: MoveBoardIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Restore an archived card to another board (admin/super only)."""
+    task = db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if user.role not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="无权放回该任务")
+    if not admin_can_touch_task(user, task):
+        raise HTTPException(status_code=403, detail="无权放回该任务")
+
+    board = db.get(Board, body.board_id)
+    if board is None or not board_can_see(db, user, body.board_id):
+        raise HTTPException(status_code=404, detail="目标看板不存在")
+    col = db.get(BoardColumn, body.column_id)
+    if col is None or col.board_id != body.board_id:
+        raise HTTPException(status_code=400, detail="目标列不属于该看板")
+
+    task.board_id = board.id
     task.column_id = col.id
     db.commit()
     db.refresh(task)

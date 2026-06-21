@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   DndContext,
@@ -10,6 +10,7 @@ import type { DragEndEvent } from '@dnd-kit/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Empty, Spin, App as AntApp } from 'antd'
 import {
+  archiveNow,
   createColumn,
   createTask,
   deleteColumn,
@@ -22,6 +23,8 @@ import {
 import { errMessage } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { BoardColumnView } from '../components/BoardColumn'
+import { RestoreModal } from '../components/RestoreModal'
+import { PRIORITY_RANK } from '../lib/badges'
 import { CardDetailModal } from '../components/CardDetailModal'
 import { canDropInto } from '../lib/actions'
 import type { BoardColumn, Task } from '../api/types'
@@ -47,6 +50,9 @@ export function BoardPage() {
 
   const board = boards.find((b) => b.id === boardId)
   const isSuperAdmin = user?.role === 'super_admin'
+  const isManager = user?.role === 'admin' || isSuperAdmin
+  const isArchive = !!board?.is_archive
+  const [restoreTask, setRestoreTask] = useState<Task | null>(null)
 
   const { data: columns = [], isLoading: colsLoading } = useQuery({
     queryKey: ['columns', boardId],
@@ -123,6 +129,25 @@ export function BoardPage() {
     onError: (e) => message.error(errMessage(e)),
   })
 
+  const setFinalM = useMutation({
+    mutationFn: ({ colId, isFinal }: { colId: number; isFinal: boolean }) =>
+      updateColumn(colId, { is_final: isFinal }),
+    onSuccess: (_d, { isFinal }) => {
+      message.success(isFinal ? '已设为最终验收完成列' : '已取消最终验收')
+      qc.invalidateQueries({ queryKey: ['columns', boardId] })
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
+
+  const archiveM = useMutation({
+    mutationFn: archiveNow,
+    onSuccess: ({ archived }) => {
+      message.success(archived > 0 ? `已归档 ${archived} 张卡片` : '没有可归档的卡片')
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
+
   const onDragEnd = (e: DragEndEvent) => {
     const task = e.active.data.current?.task as Task | undefined
     const targetCol = e.over?.data.current?.col as BoardColumn | undefined
@@ -146,14 +171,29 @@ export function BoardPage() {
     (t.assignee?.full_name.toLowerCase().includes(q) ?? false)
   const visibleTasks = tasks.filter(matchesSearch)
 
+  // Cards within a column always sort by priority (P0 → P1 → P2); same priority
+  // keeps its original order (stable). Memoized per column at render time below.
+  const colTasks = (colId: number) =>
+    visibleTasks
+      .filter((t) => t.column_id === colId)
+      .sort((a, b) => (PRIORITY_RANK[a.priority] ?? 1) - (PRIORITY_RANK[b.priority] ?? 1))
+
   return (
     <>
       <div className="board-header">
-        <span className="title">{board ? `📋 ${board.name}` : '看板'}</span>
+        <span className="title">
+          {board ? `${isArchive ? '🗄️' : '📋'} ${board.name}` : '看板'}
+        </span>
         {q && (
           <span style={{ fontSize: 13, color: '#aab2c8', fontWeight: 500 }}>
             🔍 “{q}” · 命中 {visibleTasks.length} 张卡
           </span>
+        )}
+        <span style={{ flex: 1 }} />
+        {isArchive && isSuperAdmin && (
+          <Button size="small" loading={archiveM.isPending} onClick={() => archiveM.mutate()}>
+            立即归档已完成
+          </Button>
         )}
       </div>
 
@@ -172,13 +212,15 @@ export function BoardPage() {
               <BoardColumnView
                 key={col.id}
                 col={col}
-                tasks={visibleTasks.filter((t) => t.column_id === col.id)}
+                tasks={colTasks(col.id)}
                 me={{ id: user!.id, role: user!.role }}
                 isSuperAdmin={isSuperAdmin}
                 onOpenCard={openCard}
                 onAddCard={(colId, title) => addCardM.mutate({ colId, title })}
                 onRenameColumn={(colId, name) => renameColM.mutate({ colId, name })}
                 onDeleteColumn={(colId) => deleteColM.mutate(colId)}
+                onSetFinal={(colId, isFinal) => setFinalM.mutate({ colId, isFinal })}
+                onRestore={isArchive && isManager ? setRestoreTask : undefined}
               />
             ))}
             {isSuperAdmin && (
@@ -201,6 +243,10 @@ export function BoardPage() {
 
       {taskIdParam && (
         <CardDetailModal taskId={Number(taskIdParam)} columns={columns} onClose={closeCard} />
+      )}
+
+      {restoreTask && (
+        <RestoreModal task={restoreTask} boards={boards} onClose={() => setRestoreTask(null)} />
       )}
     </>
   )

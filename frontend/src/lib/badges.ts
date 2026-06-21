@@ -22,6 +22,8 @@ export const PRIORITY_OPTIONS = [
   { value: 'normal', label: 'P1' },
   { value: 'low', label: 'P2' },
 ]
+// Sort rank: P0 (high) first, then P1, then P2. Lower = higher up the column.
+export const PRIORITY_RANK: Record<string, number> = { high: 0, normal: 1, low: 2 }
 
 export function initial(fullName: string): string {
   if (!fullName) return '?'

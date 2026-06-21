@@ -22,6 +22,7 @@ from app.models import (
     User,
 )
 from app.security import hash_password
+from app.services import get_or_create_archive_board
 
 
 def get_or_create_department(db: Session, name: str) -> Department:
@@ -310,6 +311,9 @@ def main() -> None:
         )
         ensure_recurring_assignee(db, weekly, member)
         ensure_recurring_assignee(db, weekly, member2)
+
+        # global archive board (completed cards are swept here weekly)
+        get_or_create_archive_board(db)
 
         db.commit()
         print("Seed complete.")

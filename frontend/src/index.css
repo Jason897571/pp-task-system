@@ -321,6 +321,40 @@ body {
   color: #8a92a8;
   font-weight: 700;
 }
+.mchip.done {
+  background: #14402c;
+  color: #6ee7a8;
+  font-weight: 700;
+}
+/* Final-acceptance column tag in the column header */
+.col-final-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6ee7a8;
+  background: #14402c;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-left: 6px;
+}
+/* Completed cards (in a final column) get a green left spine + restore button */
+.card.card-done {
+  box-shadow: inset 3px 0 0 #2fbf71;
+}
+.card-restore {
+  margin-top: 8px;
+  width: 100%;
+  border: 1px solid #2fbf7155;
+  background: #14402c66;
+  color: #8ef0bd;
+  border-radius: 6px;
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.card-restore:hover {
+  background: #14402c;
+}
 .av-sm {
   width: 24px;
   height: 24px;
