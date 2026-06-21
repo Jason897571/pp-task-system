@@ -1,4 +1,4 @@
-import { Button, Upload, App as AntApp } from 'antd'
+import { Upload, App as AntApp } from 'antd'
 import { useMutation } from '@tanstack/react-query'
 import { downloadFile, uploadFile } from '../api/endpoints'
 import { errMessage } from '../api/client'
@@ -25,10 +25,34 @@ async function triggerDownload(att: Attachment, onError: (msg: string) => void) 
   }
 }
 
-// Read-only list of attachments with download links. Reused for deliverable attachments.
-export function AttachmentList({ attachments }: { attachments: Attachment[] }) {
+// Read-only list of attachments with download. `pill` renders compact file pills
+// (used in the 产出 timeline); otherwise a simple link list.
+export function AttachmentList({
+  attachments,
+  pill = false,
+}: {
+  attachments: Attachment[]
+  pill?: boolean
+}) {
   const { message } = AntApp.useApp()
   if (attachments.length === 0) return null
+  if (pill) {
+    return (
+      <div>
+        {attachments.map((att) => (
+          <button
+            key={att.id}
+            type="button"
+            className="cm-file"
+            onClick={() => triggerDownload(att, message.error)}
+            title={`${att.filename} · ${fmtSize(att.filesize)}`}
+          >
+            📄 {att.filename}
+          </button>
+        ))}
+      </div>
+    )
+  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
       {attachments.map((att) => (
@@ -64,11 +88,11 @@ export function AttachmentsSection({ taskId, attachments, canEdit, onChanged }: 
   })
 
   return (
-    <section style={{ marginTop: 18 }}>
-      <h4>📎 附件</h4>
-      {attachments.length === 0 && (
-        <span style={{ color: 'var(--subtle)', fontSize: 13 }}>暂无附件</span>
-      )}
+    <section className="cd-sec">
+      <div className="cd-sec-h">
+        <span className="ic">📎</span>需求附件
+      </div>
+      {attachments.length === 0 && <span className="cd-empty">暂无附件</span>}
       <AttachmentList attachments={attachments} />
       {canEdit && (
         <Upload
@@ -78,9 +102,9 @@ export function AttachmentsSection({ taskId, attachments, canEdit, onChanged }: 
             return false // prevent antd's own XHR upload
           }}
         >
-          <Button size="small" type="dashed" loading={uploadM.isPending} style={{ marginTop: 8 }}>
-            + 上传文件
-          </Button>
+          <button type="button" className="cd-add" style={{ marginTop: 8 }}>
+            {uploadM.isPending ? '上传中…' : '+ 上传文件'}
+          </button>
         </Upload>
       )}
     </section>

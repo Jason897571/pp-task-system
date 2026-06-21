@@ -53,10 +53,12 @@ export function TagsSection({ taskId, tags, canEdit, onChanged }: Props) {
   }
 
   return (
-    <section style={{ marginTop: 18 }}>
-      <h4>🏷 标签</h4>
+    <section className="cd-sec">
+      <div className="cd-sec-h">
+        <span className="ic">🏷</span>标签
+      </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-        {tags.length === 0 && <span style={{ color: 'var(--subtle)', fontSize: 13 }}>暂无标签</span>}
+        {tags.length === 0 && <span className="cd-empty">暂无标签</span>}
         {tags.map((t) => (
           <span
             key={t.id}
@@ -118,9 +120,9 @@ export function TagsSection({ taskId, tags, canEdit, onChanged }: Props) {
               </div>
             }
           >
-            <Button size="small" type="dashed">
+            <button type="button" className="cd-add">
               + 标签
-            </Button>
+            </button>
           </Popover>
         )}
       </div>

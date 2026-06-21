@@ -1,4 +1,4 @@
-import { Modal, Spin, Typography, App as AntApp } from 'antd'
+import { Modal, Spin, App as AntApp } from 'antd'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   applyTask,
@@ -18,7 +18,7 @@ import { CardActions } from './CardActions'
 import { TagsSection } from './TagsSection'
 import { ChecklistsSection } from './ChecklistsSection'
 import { AttachmentsSection, AttachmentList } from './AttachmentsSection'
-import { avatarColor, dueLabel, initial } from '../lib/badges'
+import { avatarColor, dueLabel, dueState, initial } from '../lib/badges'
 
 interface Props {
   taskId: number
@@ -104,44 +104,76 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
       user.role === 'super_admin' ||
       task.assignee?.id === user.id)
 
+  const due = task ? dueState(task.due_date, columnKind) : null
+  const status = task ? deliverStatus(columnKind, task.is_rework) : null
+
+  const cardActions = task && user && (
+    <CardActions
+      task={task}
+      columnKind={columnKind}
+      me={{ id: user.id, role: user.role }}
+      assignableUsers={assignableUsers(users, task.applications.map((a) => a.applicant))}
+      busy={busy}
+      onStart={() => wrap(() => startM.mutateAsync(), '已开始')}
+      onSubmit={(note, files) => wrap(() => submitM.mutateAsync({ note, files }), '已提交产出')}
+      onApply={() => wrap(() => applyM.mutateAsync(), '已申请')}
+      onReview={(approve, comment) =>
+        wrap(() => reviewM.mutateAsync({ approve, comment }), approve ? '已通过' : '已打回')
+      }
+      onApprove={(approve, assigneeId) =>
+        wrap(
+          () => approveM.mutateAsync({ approve, assignee_id: assigneeId }),
+          approve ? '已通过并指派' : '已拒绝',
+        )
+      }
+      onAssign={(id) => wrap(() => assignM.mutateAsync(id), '已指派')}
+    />
+  )
+
   return (
-    <Modal open width={768} footer={null} onCancel={onClose} title={null}>
+    <Modal open width={720} footer={null} onCancel={onClose} title={null} className="cm-modal">
       {isLoading || !task || !user ? (
-        <div style={{ display: 'grid', placeItems: 'center', height: 200 }}>
+        <div style={{ display: 'grid', placeItems: 'center', height: 220, background: '#0f1320' }}>
           <Spin />
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 16 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <Typography.Title level={4} style={{ marginTop: 0 }}>
-              {task.title}
-            </Typography.Title>
-            <Typography.Text type="secondary">
-              {column ? `在 ${column.name} 列中` : lifecycleLabel(task.lifecycle)}
-              {task.is_rework && ' · ↩ 重做'}
-              {task.assignee && ` · 负责人 ${task.assignee.full_name}`}
-            </Typography.Text>
+        <div className="cm">
+          {/* ===================== 需求 ===================== */}
+          <div className="cm-req">
+            <div className="cm-zonetag">需求 · REQUIREMENT</div>
+            <div className="cm-titlerow">
+              <h2 className="cm-title">{task.title}</h2>
+            </div>
+            <div className="cm-chips">
+              {task.assignee ? (
+                <span className="cm-chip">
+                  <span
+                    className="av-sm"
+                    style={{ width: 18, height: 18, background: avatarColor(task.assignee.id) }}
+                  >
+                    {initial(task.assignee.full_name)}
+                  </span>
+                  {task.assignee.full_name}
+                </span>
+              ) : (
+                <span className="cm-chip muted">未指派</span>
+              )}
+              <span className="cm-chip">{column ? column.name : lifecycleLabel(task.lifecycle)}</span>
+              {task.due_date && due && (
+                <span className="cm-chip due">🕒 {dueLabel(task.due_date)}</span>
+              )}
+              {task.priority === 'high' && <span className="cm-chip hot">⬆ 高优先级</span>}
+              {task.is_rework && <span className="cm-chip rw">↩ 重做</span>}
+            </div>
 
-            <section style={{ marginTop: 18 }}>
-              <h4>📝 描述</h4>
-              <div
-                style={{
-                  background: 'var(--card-bg)',
-                  borderRadius: 6,
-                  padding: '10px 12px',
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
-                {task.description || '（无描述）'}
+            <section className="cd-sec">
+              <div className="cd-sec-h">
+                <span className="ic">📝</span>需求描述
+              </div>
+              <div className={`cm-desc ${task.description ? '' : 'empty'}`}>
+                {task.description || '暂无描述'}
               </div>
             </section>
-
-            {task.due_date && (
-              <section style={{ marginTop: 14 }}>
-                <h4>🕒 截止</h4>
-                <div>{dueLabel(task.due_date)}</div>
-              </section>
-            )}
 
             <TagsSection
               taskId={task.id}
@@ -149,57 +181,46 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
               canEdit={canEdit}
               onChanged={invalidate}
             />
-
             <ChecklistsSection
               taskId={task.id}
               checklists={task.checklists}
               canEdit={canEdit}
               onChanged={invalidate}
             />
-
             <AttachmentsSection
               taskId={task.id}
               attachments={task.attachments}
               canEdit={canEdit}
               onChanged={invalidate}
             />
+          </div>
 
-            <section style={{ marginTop: 18 }}>
-              <h4>📦 产出历史</h4>
-              {task.deliverables.length === 0 ? (
-                <Typography.Text type="secondary">暂无产出</Typography.Text>
-              ) : (
-                task.deliverables.map((d) => (
-                  <div
-                    key={d.id}
-                    style={{
-                      background: 'var(--card-bg)',
-                      borderRadius: 6,
-                      padding: '8px 10px',
-                      marginBottom: 6,
-                    }}
-                  >
-                    <b>{d.submitter.full_name}</b> · {d.note}
-                    <AttachmentList attachments={d.attachments} />
-                  </div>
-                ))
-              )}
-            </section>
+          {/* ===================== 流向 ===================== */}
+          <div className="cm-flow">
+            <span className="lab">需求</span>
+            <span className="ln" />
+            <span className="arr">▼</span>
+            <span className="ln" />
+            <span className="lab">产出</span>
+          </div>
+
+          {/* ===================== 产出 ===================== */}
+          <div className="cm-out">
+            <div className="cm-zonetag">产出 · DELIVERABLES</div>
+            {status && (
+              <div style={{ marginTop: 10 }}>
+                <span className={`cm-banner ${status.cls}`}>{status.label}</span>
+              </div>
+            )}
 
             {task.lifecycle === 'open' && task.applications.length > 0 && (
-              <section style={{ marginTop: 18 }}>
-                <h4>🙋 申请人</h4>
+              <section className="cd-sec">
+                <div className="cd-sec-h">
+                  <span className="ic">🙋</span>申请人
+                </div>
                 {task.applications.map((a) => (
-                  <div key={a.id} style={{ padding: '4px 0' }}>
-                    <span
-                      className="av-sm"
-                      style={{
-                        background: avatarColor(a.applicant.id),
-                        display: 'inline-grid',
-                        verticalAlign: 'middle',
-                        marginRight: 8,
-                      }}
-                    >
+                  <div key={a.id} className="cm-appl">
+                    <span className="av-sm" style={{ background: avatarColor(a.applicant.id) }}>
                       {initial(a.applicant.full_name)}
                     </span>
                     {a.applicant.full_name}
@@ -207,39 +228,62 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                 ))}
               </section>
             )}
-          </div>
 
-          <div style={{ width: 180, flexShrink: 0 }}>
-            <div className="grp" style={{ padding: '0 0 4px' }}>
-              动作
-            </div>
-            <CardActions
-              task={task}
-              columnKind={columnKind}
-              me={{ id: user.id, role: user.role }}
-              assignableUsers={assignableUsers(users, task.applications.map((a) => a.applicant))}
-              busy={busy}
-              onStart={() => wrap(() => startM.mutateAsync(), '已开始')}
-              onSubmit={(note, files) =>
-                wrap(() => submitM.mutateAsync({ note, files }), '已提交产出')
-              }
-              onApply={() => wrap(() => applyM.mutateAsync(), '已申请')}
-              onReview={(approve, comment) =>
-                wrap(() => reviewM.mutateAsync({ approve, comment }), approve ? '已通过' : '已打回')
-              }
-              onApprove={(approve, assigneeId) =>
-                wrap(
-                  () => approveM.mutateAsync({ approve, assignee_id: assigneeId }),
-                  approve ? '已通过并指派' : '已拒绝',
-                )
-              }
-              onAssign={(id) => wrap(() => assignM.mutateAsync(id), '已指派')}
-            />
+            {task.deliverables.length === 0 ? (
+              <div className="cd-empty" style={{ marginTop: 12 }}>
+                暂无产出
+              </div>
+            ) : (
+              <div className="cm-tl">
+                {task.deliverables.map((d, i) => {
+                  const last = i === task.deliverables.length - 1
+                  return (
+                    <div
+                      key={d.id}
+                      className={`cm-tlitem ${last && status ? status.tlcls : ''}`}
+                    >
+                      <div className="cm-glass">
+                        <div className="cm-tlhead">
+                          <span
+                            className="av-sm"
+                            style={{ width: 20, height: 20, background: avatarColor(d.submitter.id) }}
+                          >
+                            {initial(d.submitter.full_name)}
+                          </span>
+                          <b>{d.submitter.full_name}</b>
+                          <span className="tm">{dueLabel(d.created_at)}</span>
+                          {last && status && (
+                            <span className={`cm-stat ${status.cls}`}>{status.short}</span>
+                          )}
+                        </div>
+                        {d.note && <div className="cm-note">{d.note}</div>}
+                        <AttachmentList attachments={d.attachments} pill />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {cardActions && <div className="cm-actions">{cardActions}</div>}
           </div>
         </div>
       )}
     </Modal>
   )
+}
+
+// Current output status derived from the column kind + rework flag (truthful, no
+// per-deliverable state in the model). Drives the banner + last-node pill colour.
+function deliverStatus(
+  kind: string | null,
+  rework: boolean,
+): { label: string; short: string; cls: string; tlcls: string } | null {
+  if (kind === 'review') return { label: '⏳ 待审核中', short: '待审核', cls: 'wait', tlcls: '' }
+  if (kind === 'done') return { label: '✓ 已通过 · 已完成', short: '已通过', cls: 'ok', tlcls: 'ok' }
+  if (kind === 'doing' && rework)
+    return { label: '↩ 已打回 · 待重新提交', short: '已打回', cls: 'rej', tlcls: 'rej' }
+  return null
 }
 
 function lifecycleLabel(lc: string): string {

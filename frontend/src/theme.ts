@@ -1,32 +1,35 @@
 import { theme } from 'antd'
 import type { ThemeConfig } from 'antd'
 
-// Trello dark-mode tokens (see spec §7.1 / demo/board-dark.html).
+// "分屏暗色 Pro" tokens — deep navy surfaces + violet→cyan neon accents.
 export const trelloDarkTheme: ThemeConfig = {
   algorithm: theme.darkAlgorithm,
   token: {
-    colorPrimary: '#579dff',
-    colorBgBase: '#1d2125',
-    colorBgContainer: '#22272b',
-    colorBgElevated: '#282e33',
-    colorText: '#b6c2cf',
-    colorTextHeading: '#dee4ea',
-    colorBorder: '#ffffff1f',
-    borderRadius: 8,
+    colorPrimary: '#7c5cff',
+    colorInfo: '#7c5cff',
+    colorLink: '#22d3ee',
+    colorBgBase: '#0a0c14',
+    colorBgContainer: '#131a2b',
+    colorBgElevated: '#161d2e',
+    colorText: '#c7d0e2',
+    colorTextHeading: '#ffffff',
+    colorBorder: '#ffffff22',
+    borderRadius: 9,
     fontFamily:
       '-apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
   },
 }
 
 export const C = {
-  bgGrad: 'linear-gradient(135deg, #3d2a5e 0%, #523568 45%, #6b3f6a 100%)',
-  topbar: '#1d2125',
-  listBg: '#1d2125f2',
-  cardBg: '#22272b',
-  cardHover: '#282e33',
-  text: '#b6c2cf',
-  subtle: '#9fadbc',
-  heading: '#dee4ea',
-  line: '#ffffff1f',
-  blue: '#579dff',
+  bgGrad: 'radial-gradient(1100px 620px at 50% -8%, #1b2348 0%, #0a0c14 58%)',
+  topbar: '#0f1320',
+  listBg: '#121829f2',
+  cardBg: '#161d2e',
+  cardHover: '#1b2440',
+  text: '#c7d0e2',
+  subtle: '#8a92a8',
+  heading: '#ffffff',
+  line: '#ffffff16',
+  blue: '#7c5cff',
+  accent: '#22d3ee',
 }

@@ -40,11 +40,11 @@ export function ChecklistsSection({ taskId, checklists, canEdit, onChanged }: Pr
   })
 
   return (
-    <section style={{ marginTop: 18 }}>
-      <h4>☑ 清单</h4>
-      {checklists.length === 0 && (
-        <span style={{ color: 'var(--subtle)', fontSize: 13 }}>暂无清单</span>
-      )}
+    <section className="cd-sec">
+      <div className="cd-sec-h">
+        <span className="ic">☑</span>清单
+      </div>
+      {checklists.length === 0 && <span className="cd-empty">暂无清单</span>}
       {checklists.map((cl) => (
         <ChecklistBlock key={cl.id} checklist={cl} canEdit={canEdit} handle={handle} />
       ))}
@@ -68,9 +68,14 @@ export function ChecklistsSection({ taskId, checklists, canEdit, onChanged }: Pr
             </Button>
           </div>
         ) : (
-          <Button size="small" type="dashed" style={{ marginTop: 8 }} onClick={() => setAdding(true)}>
+          <button
+            type="button"
+            className="cd-add"
+            style={{ marginTop: 8 }}
+            onClick={() => setAdding(true)}
+          >
             + 添加清单
-          </Button>
+          </button>
         ))}
     </section>
   )
