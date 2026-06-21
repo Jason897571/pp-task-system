@@ -306,6 +306,21 @@ body {
   background: #5d1f1a;
   color: #ff9c8f;
 }
+.mchip.prio-high {
+  background: #fb718526;
+  color: #ff8fa3;
+  font-weight: 700;
+}
+.mchip.prio-normal {
+  background: #7c5cff26;
+  color: #b9aaff;
+  font-weight: 700;
+}
+.mchip.prio-low {
+  background: #ffffff12;
+  color: #8a92a8;
+  font-weight: 700;
+}
 .av-sm {
   width: 24px;
   height: 24px;

@@ -1,5 +1,5 @@
 import type { ColumnKind, Task } from '../api/types'
-import { avatarColor, dueLabel, dueState, initial } from '../lib/badges'
+import { avatarColor, dueLabel, dueState, initial, PRIORITY_LABEL } from '../lib/badges'
 
 // Card front (spec §7.3). Layout: colored label pills → title → hairline
 // divider → meta row (status chips on the left, assignee avatar on the right).
@@ -11,6 +11,11 @@ export function CardFront({ task, columnKind }: { task: Task; columnKind: Column
   const checklistDone = hasChecklist && cs.done === cs.total
 
   const chips: React.ReactNode[] = []
+  chips.push(
+    <span key="prio" className={`mchip prio-${task.priority}`}>
+      {PRIORITY_LABEL[task.priority] ?? 'P1'}
+    </span>,
+  )
   if (task.due_date && due) {
     chips.push(
       <span key="due" className={`mchip due-${due}`}>

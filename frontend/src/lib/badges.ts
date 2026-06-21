@@ -15,6 +15,14 @@ export const TAG_COLORS: Record<TagColor, string> = {
 
 export const TAG_COLOR_KEYS = Object.keys(TAG_COLORS) as TagColor[]
 
+// Priority shown as P0 (urgent) / P1 / P2, mapped to the stored low/normal/high.
+export const PRIORITY_LABEL: Record<string, string> = { high: 'P0', normal: 'P1', low: 'P2' }
+export const PRIORITY_OPTIONS = [
+  { value: 'high', label: 'P0' },
+  { value: 'normal', label: 'P1' },
+  { value: 'low', label: 'P2' },
+]
+
 export function initial(fullName: string): string {
   if (!fullName) return '?'
   // Latin names → first letter uppercased; CJK names → surname (first char).

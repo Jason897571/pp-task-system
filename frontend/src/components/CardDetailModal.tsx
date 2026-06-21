@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, DatePicker, Input, Modal, Spin, Upload, App as AntApp } from 'antd'
+import { Button, DatePicker, Input, Modal, Select, Spin, Upload, App as AntApp } from 'antd'
 import type { UploadFile } from 'antd'
 import dayjs from 'dayjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -21,7 +21,14 @@ import type { BoardColumn, User } from '../api/types'
 import { CardActions } from './CardActions'
 import { ChecklistsSection } from './ChecklistsSection'
 import { AttachmentsSection, AttachmentList } from './AttachmentsSection'
-import { avatarColor, dueLabel, dueState, initial } from '../lib/badges'
+import {
+  avatarColor,
+  dueLabel,
+  dueState,
+  initial,
+  PRIORITY_LABEL,
+  PRIORITY_OPTIONS,
+} from '../lib/badges'
 
 interface Props {
   taskId: number
@@ -88,7 +95,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
   })
   const assignM = useMutation({ mutationFn: (id: number) => assignTask(taskId, id) })
   const updateM = useMutation({
-    mutationFn: (body: { description?: string; due_date?: string | null }) =>
+    mutationFn: (body: { description?: string; due_date?: string | null; priority?: string }) =>
       updateTask(taskId, body),
   })
 
@@ -132,6 +139,16 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
       .mutateAsync({ due_date: due })
       .then(() => {
         message.success(due ? '已更新截止时间' : '已清除截止时间')
+        invalidate()
+      })
+      .catch((e) => message.error(errMessage(e)))
+  }
+
+  const savePriority = (priority: string) => {
+    updateM
+      .mutateAsync({ priority })
+      .then(() => {
+        message.success('已更新优先级')
         invalidate()
       })
       .catch((e) => message.error(errMessage(e)))
@@ -205,7 +222,9 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                   🕒 {dueLabel(task.due_date)}
                 </span>
               )}
-              {task.priority === 'high' && <span className="cm-chip hot">⬆ 高优先级</span>}
+              <span className={`cm-chip ${task.priority === 'high' ? 'hot' : ''}`}>
+                {PRIORITY_LABEL[task.priority] ?? 'P1'}
+              </span>
               {task.is_rework && <span className="cm-chip rw">↩ 重做</span>}
             </div>
 
@@ -284,6 +303,24 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                   </span>
                 ) : (
                   <span className="cd-empty">未设置截止时间</span>
+                )}
+              </section>
+
+              <section className="cd-sec" style={{ flex: '0 0 auto' }}>
+                <div className="cd-sec-h">
+                  <span className="ic">⚑</span>优先级
+                </div>
+                {isManager ? (
+                  <Select
+                    value={task.priority}
+                    style={{ width: 90 }}
+                    options={PRIORITY_OPTIONS}
+                    onChange={savePriority}
+                  />
+                ) : (
+                  <span className={`cm-chip ${task.priority === 'high' ? 'hot' : ''}`}>
+                    {PRIORITY_LABEL[task.priority] ?? 'P1'}
+                  </span>
                 )}
               </section>
 
