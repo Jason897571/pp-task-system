@@ -72,6 +72,11 @@ export const getTasks = (params: { board_id?: number; assignee?: number; lifecyc
 export const getTask = (id: number) =>
   api.get<TaskDetail>(`/tasks/${id}`).then((r) => r.data)
 
+export const updateTask = (
+  id: number,
+  body: { title?: string; description?: string; priority?: string; due_date?: string | null },
+) => api.put<TaskDetail>(`/tasks/${id}`, body).then((r) => r.data)
+
 export const createTask = (body: CreateTaskBody) =>
   api.post<Task>('/tasks', body).then((r) => r.data)
 

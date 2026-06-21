@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Button, Input, Modal, Select, Upload, App as AntApp } from 'antd'
-import type { UploadFile } from 'antd'
+import { Button, Input, Modal, Select, App as AntApp } from 'antd'
 import type { TaskDetail, User } from '../api/types'
 import { visibleActions } from '../lib/actions'
 import type { ActionKey } from '../lib/actions'
@@ -36,9 +35,6 @@ export function CardActions(props: Props) {
   const { message } = AntApp.useApp()
   const actions = visibleActions({ task, columnKind, me })
 
-  const [submitOpen, setSubmitOpen] = useState(false)
-  const [submitNote, setSubmitNote] = useState('')
-  const [submitFiles, setSubmitFiles] = useState<UploadFile[]>([])
   const [reviewRejectOpen, setReviewRejectOpen] = useState(false)
   const [reviewComment, setReviewComment] = useState('')
   const [assignTarget, setAssignTarget] = useState<number | undefined>()
@@ -54,12 +50,6 @@ export function CardActions(props: Props) {
       {actions.includes('start') && (
         <Button data-action="start" type="primary" block loading={busy} onClick={props.onStart}>
           {LABELS.start}
-        </Button>
-      )}
-
-      {actions.includes('submit') && (
-        <Button data-action="submit" type="primary" block onClick={() => setSubmitOpen(true)}>
-          {LABELS.submit}
         </Button>
       )}
 
@@ -143,39 +133,6 @@ export function CardActions(props: Props) {
           </Button>
         </>
       )}
-
-      <Modal
-        title="提交产出"
-        open={submitOpen}
-        okText="提交"
-        confirmLoading={busy}
-        onCancel={() => setSubmitOpen(false)}
-        onOk={() => {
-          const files = submitFiles.map((f) => f.originFileObj as File).filter(Boolean)
-          props.onSubmit(submitNote, files)
-          setSubmitOpen(false)
-          setSubmitNote('')
-          setSubmitFiles([])
-        }}
-      >
-        <Input.TextArea
-          rows={4}
-          placeholder="产出说明 / 链接"
-          value={submitNote}
-          onChange={(e) => setSubmitNote(e.target.value)}
-        />
-        <Upload
-          style={{ marginTop: 10 }}
-          fileList={submitFiles}
-          beforeUpload={() => false} // collect locally; upload happens after submit
-          onChange={({ fileList }) => setSubmitFiles(fileList)}
-          multiple
-        >
-          <Button size="small" style={{ marginTop: 10 }}>
-            📎 添加附件
-          </Button>
-        </Upload>
-      </Modal>
 
       <Modal
         title="打回重做"

@@ -1,4 +1,6 @@
-import { Modal, Spin, App as AntApp } from 'antd'
+import { useState } from 'react'
+import { Button, Input, Modal, Spin, Upload, App as AntApp } from 'antd'
+import type { UploadFile } from 'antd'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   applyTask,
@@ -9,6 +11,7 @@ import {
   reviewTask,
   startTask,
   submitTask,
+  updateTask,
   uploadFile,
 } from '../api/endpoints'
 import { errMessage } from '../api/client'
@@ -83,6 +86,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
     mutationFn: (b: { approve: boolean; assignee_id?: number }) => approveTask(taskId, b),
   })
   const assignM = useMutation({ mutationFn: (id: number) => assignTask(taskId, id) })
+  const updateM = useMutation({ mutationFn: (description: string) => updateTask(taskId, { description }) })
 
   const busy =
     startM.isPending ||
@@ -92,16 +96,40 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
     approveM.isPending ||
     assignM.isPending
 
+  // Inline description editing (admin/super) + inline 产出 composer state.
+  const [editingDesc, setEditingDesc] = useState(false)
+  const [descDraft, setDescDraft] = useState('')
+  const [outNote, setOutNote] = useState('')
+  const [outFiles, setOutFiles] = useState<UploadFile[]>([])
+
   const column = task ? columns.find((c) => c.id === task.column_id) ?? null : null
   const columnKind = column?.kind ?? null
 
   // Edit permission for tags/checklists/attachments: admin/super_admin or assignee.
-  const canEdit =
-    !!task &&
-    !!user &&
-    (user.role === 'admin' ||
-      user.role === 'super_admin' ||
-      task.assignee?.id === user.id)
+  const isManager = user?.role === 'admin' || user?.role === 'super_admin'
+  const canEdit = !!task && !!user && (isManager || task.assignee?.id === user.id)
+  // Output composer shows in the 进行中 column for the assignee or a manager.
+  const canCompose =
+    !!task && !!user && columnKind === 'doing' && (isManager || task.assignee?.id === user.id)
+
+  const saveDesc = () => {
+    updateM
+      .mutateAsync(descDraft)
+      .then(() => {
+        message.success('已更新描述')
+        setEditingDesc(false)
+        invalidate()
+      })
+      .catch((e) => message.error(errMessage(e)))
+  }
+
+  const submitOutput = () => {
+    const files = outFiles.map((f) => f.originFileObj as File).filter(Boolean)
+    wrap(() => submitM.mutateAsync({ note: outNote, files }), '已提交产出').then(() => {
+      setOutNote('')
+      setOutFiles([])
+    })
+  }
 
   const due = task ? dueState(task.due_date, columnKind) : null
   const status = task ? deliverStatus(columnKind, task.is_rework) : null
@@ -168,10 +196,56 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
             <section className="cd-sec">
               <div className="cd-sec-h">
                 <span className="ic">📝</span>需求描述
+                {isManager && !editingDesc && (
+                  <button
+                    type="button"
+                    className="cm-edit"
+                    onClick={() => {
+                      setDescDraft(task.description || '')
+                      setEditingDesc(true)
+                    }}
+                  >
+                    ✎ 编辑
+                  </button>
+                )}
               </div>
-              <div className={`cm-desc ${task.description ? '' : 'empty'}`}>
-                {task.description || '暂无描述'}
-              </div>
+              {editingDesc ? (
+                <div>
+                  <Input.TextArea
+                    autoSize={{ minRows: 3, maxRows: 12 }}
+                    value={descDraft}
+                    onChange={(e) => setDescDraft(e.target.value)}
+                    placeholder="输入需求描述…"
+                  />
+                  <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                    <Button
+                      type="primary"
+                      size="small"
+                      loading={updateM.isPending}
+                      onClick={saveDesc}
+                    >
+                      保存
+                    </Button>
+                    <Button size="small" onClick={() => setEditingDesc(false)}>
+                      取消
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className={`cm-desc ${task.description ? '' : 'empty'} ${isManager ? 'editable' : ''}`}
+                  onClick={
+                    isManager
+                      ? () => {
+                          setDescDraft(task.description || '')
+                          setEditingDesc(true)
+                        }
+                      : undefined
+                  }
+                >
+                  {task.description || (isManager ? '点击添加描述…' : '暂无描述')}
+                </div>
+              )}
             </section>
 
             <ChecklistsSection
@@ -255,6 +329,38 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                     </div>
                   )
                 })}
+              </div>
+            )}
+
+            {canCompose && (
+              <div className="cm-composer">
+                <div className="cd-sec-h" style={{ marginBottom: 8 }}>
+                  <span className="ic">⬆</span>提交产出
+                </div>
+                <Input.TextArea
+                  autoSize={{ minRows: 2, maxRows: 8 }}
+                  value={outNote}
+                  onChange={(e) => setOutNote(e.target.value)}
+                  placeholder="填写产出说明 / 链接…"
+                />
+                <div className="cm-composer-row">
+                  <Upload
+                    fileList={outFiles}
+                    beforeUpload={() => false}
+                    onChange={({ fileList }) => setOutFiles(fileList)}
+                    multiple
+                  >
+                    <Button size="small">📎 上传文件</Button>
+                  </Upload>
+                  <Button
+                    type="primary"
+                    loading={submitM.isPending}
+                    disabled={!outNote.trim() && outFiles.length === 0}
+                    onClick={submitOutput}
+                  >
+                    提交产出
+                  </Button>
+                </div>
               </div>
             )}
 

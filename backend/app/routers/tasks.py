@@ -20,6 +20,7 @@ from app.schemas import (
     TaskDetailOut,
     TaskIn,
     TaskOut,
+    TaskUpdateIn,
 )
 from app.services import (
     admin_can_touch_task,
@@ -158,6 +159,34 @@ def get_task(
         raise HTTPException(status_code=404, detail="任务不存在")
     if not _visible_to(db, user, task):
         raise HTTPException(status_code=403, detail="无权查看该任务")
+    return serialize_task_detail(db, task)
+
+
+@router.put("/tasks/{task_id}", response_model=TaskDetailOut)
+def update_task(
+    task_id: int,
+    body: TaskUpdateIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Edit task details (title / description / priority / due date). admin/super
+    (admin scoped to own department)."""
+    task = db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not admin_can_touch_task(user, task):
+        raise HTTPException(status_code=403, detail="无权编辑该任务")
+    data = body.model_dump(exclude_unset=True)
+    if "title" in data and data["title"] is not None:
+        task.title = data["title"]
+    if "description" in data:
+        task.description = data["description"]
+    if "priority" in data and data["priority"] is not None:
+        task.priority = data["priority"]
+    if "due_date" in data:
+        task.due_date = data["due_date"]
+    db.commit()
+    db.refresh(task)
     return serialize_task_detail(db, task)
 
 
@@ -306,8 +335,8 @@ def submit_task(
     task = db.get(Task, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="任务不存在")
-    if task.assignee_id != user.id:
-        raise HTTPException(status_code=403, detail="只能提交自己的任务")
+    if task.assignee_id != user.id and not admin_can_touch_task(user, task):
+        raise HTTPException(status_code=403, detail="无权提交该任务的产出")
     if _column_kind(db, task) != "doing":
         raise HTTPException(status_code=409, detail="任务不在进行中列")
     review = column_of_kind(db, task.board_id, "review")

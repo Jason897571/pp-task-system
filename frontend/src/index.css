@@ -474,6 +474,45 @@ body {
 .cm-desc.empty {
   color: #707892;
 }
+.cm-desc.editable {
+  cursor: text;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.cm-desc.editable:hover {
+  border-color: #7c5cff66;
+  background: #0c101c;
+}
+.cm-edit {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: #9d8cff;
+  background: #7c5cff1f;
+  border: none;
+  border-radius: 6px;
+  padding: 2px 9px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.cm-edit:hover {
+  background: #7c5cff33;
+  color: #fff;
+}
+.cm-composer {
+  margin-top: 18px;
+  background: #0a0d17;
+  border: 1px solid #ffffff14;
+  border-radius: 12px;
+  padding: 13px 14px;
+}
+.cm-composer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
 
 /* generic section helpers (used by tags / checklists / attachments) */
 .cd-sec {

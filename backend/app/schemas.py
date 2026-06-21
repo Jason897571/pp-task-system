@@ -222,6 +222,13 @@ class TaskIn(BaseModel):
     due_date: datetime | None = None
 
 
+class TaskUpdateIn(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    priority: str | None = None
+    due_date: datetime | None = None
+
+
 class AssignIn(BaseModel):
     assignee_id: int
 
