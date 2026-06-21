@@ -264,37 +264,42 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
               )}
             </section>
 
-            <section className="cd-sec">
-              <div className="cd-sec-h">
-                <span className="ic">📅</span>截止时间
-              </div>
-              {isManager ? (
-                <DatePicker
-                  showTime={{ format: 'HH:mm' }}
-                  format="YYYY-MM-DD HH:mm"
-                  placeholder="设置截止时间"
-                  style={{ width: 220 }}
-                  value={task.due_date ? dayjs(task.due_date) : null}
-                  onChange={(d) => saveDue(d ? d.toISOString() : null)}
+            <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <section className="cd-sec" style={{ flex: '0 0 auto' }}>
+                <div className="cd-sec-h">
+                  <span className="ic">📅</span>截止时间
+                </div>
+                {isManager ? (
+                  <DatePicker
+                    showTime={{ format: 'HH:mm' }}
+                    format="YYYY-MM-DD HH:mm"
+                    placeholder="设置截止时间"
+                    style={{ width: 220 }}
+                    value={task.due_date ? dayjs(task.due_date) : null}
+                    onChange={(d) => saveDue(d ? d.toISOString() : null)}
+                  />
+                ) : task.due_date && due ? (
+                  <span className={`cm-chip ${due === 'over' ? 'rw' : 'due'}`}>
+                    🕒 {dueLabel(task.due_date)}
+                  </span>
+                ) : (
+                  <span className="cd-empty">未设置截止时间</span>
+                )}
+              </section>
+
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <AttachmentsSection
+                  taskId={task.id}
+                  attachments={task.attachments}
+                  canEdit={canEdit}
+                  onChanged={invalidate}
                 />
-              ) : task.due_date && due ? (
-                <span className={`cm-chip ${due === 'over' ? 'rw' : 'due'}`}>
-                  🕒 {dueLabel(task.due_date)}
-                </span>
-              ) : (
-                <span className="cd-empty">未设置截止时间</span>
-              )}
-            </section>
+              </div>
+            </div>
 
             <ChecklistsSection
               taskId={task.id}
               checklists={task.checklists}
-              canEdit={canEdit}
-              onChanged={invalidate}
-            />
-            <AttachmentsSection
-              taskId={task.id}
-              attachments={task.attachments}
               canEdit={canEdit}
               onChanged={invalidate}
             />
@@ -362,7 +367,12 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                           )}
                         </div>
                         {d.note && <div className="cm-note">{d.note}</div>}
-                        <AttachmentList attachments={d.attachments} pill />
+                        <AttachmentList
+                          attachments={d.attachments}
+                          pill
+                          deletable={canEdit}
+                          onDeleted={invalidate}
+                        />
                       </div>
                     </div>
                   )

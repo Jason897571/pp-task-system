@@ -680,9 +680,35 @@ body {
   background: #22d3ee18;
   padding: 6px 10px;
   border-radius: 8px;
-  margin: 8px 6px 0 0;
   cursor: pointer;
   border: none;
+}
+.cm-file-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 8px 6px 0 0;
+}
+/* attachment rows + delete affordance */
+.att-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.att-row a {
+  cursor: pointer;
+}
+.att-del {
+  font-size: 11px;
+  color: #8a92a8;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+.att-del:hover {
+  color: #fb7185;
+  background: #fb71851f;
 }
 .cm-stat {
   margin-left: auto;

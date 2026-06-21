@@ -128,3 +128,25 @@ def download_file(
         media_type=att.content_type or "application/octet-stream",
         filename=att.filename,
     )
+
+
+@router.delete("/files/{file_id}")
+def delete_file(
+    file_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    att = db.get(Attachment, file_id)
+    if att is None:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    task = _task_for_owner(db, att.owner_type, att.owner_id)
+    # the uploader, or anyone who can edit the task, may delete it
+    if att.uploader_id != user.id and not (task and can_edit_task(user, task)):
+        raise HTTPException(status_code=403, detail="无权删除该文件")
+    try:
+        Path(att.filepath).unlink(missing_ok=True)
+    except OSError:
+        pass  # best-effort disk cleanup; still drop the DB row
+    db.delete(att)
+    db.commit()
+    return {"ok": True}

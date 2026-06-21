@@ -1,6 +1,6 @@
-import { Upload, App as AntApp } from 'antd'
+import { Popconfirm, Upload, App as AntApp } from 'antd'
 import { useMutation } from '@tanstack/react-query'
-import { downloadFile, uploadFile } from '../api/endpoints'
+import { deleteFile, downloadFile, uploadFile } from '../api/endpoints'
 import { errMessage } from '../api/client'
 import type { Attachment } from '../api/types'
 
@@ -25,30 +25,61 @@ async function triggerDownload(att: Attachment, onError: (msg: string) => void) 
   }
 }
 
-// Read-only list of attachments with download. `pill` renders compact file pills
-// (used in the 产出 timeline); otherwise a simple link list.
+// List of attachments with download. `pill` renders compact file pills (used in
+// the 产出 timeline). When `deletable`, each file gets a ✕ (uploader / managers).
 export function AttachmentList({
   attachments,
   pill = false,
+  deletable = false,
+  onDeleted,
 }: {
   attachments: Attachment[]
   pill?: boolean
+  deletable?: boolean
+  onDeleted?: () => void
 }) {
   const { message } = AntApp.useApp()
+
+  const del = (att: Attachment) =>
+    deleteFile(att.id)
+      .then(() => {
+        message.success('已删除附件')
+        onDeleted?.()
+      })
+      .catch((e) => message.error(errMessage(e)))
+
+  const DeleteX = ({ att }: { att: Attachment }) =>
+    deletable ? (
+      <Popconfirm
+        title="删除附件"
+        description={`确定删除「${att.filename}」？`}
+        okText="删除"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+        onConfirm={() => del(att)}
+      >
+        <span className="att-del" onClick={(e) => e.stopPropagation()} title="删除">
+          ✕
+        </span>
+      </Popconfirm>
+    ) : null
+
   if (attachments.length === 0) return null
   if (pill) {
     return (
       <div>
         {attachments.map((att) => (
-          <button
-            key={att.id}
-            type="button"
-            className="cm-file"
-            onClick={() => triggerDownload(att, message.error)}
-            title={`${att.filename} · ${fmtSize(att.filesize)}`}
-          >
-            📄 {att.filename}
-          </button>
+          <span key={att.id} className="cm-file-wrap">
+            <button
+              type="button"
+              className="cm-file"
+              onClick={() => triggerDownload(att, message.error)}
+              title={`${att.filename} · ${fmtSize(att.filesize)}`}
+            >
+              📄 {att.filename}
+            </button>
+            <DeleteX att={att} />
+          </span>
         ))}
       </div>
     )
@@ -56,13 +87,13 @@ export function AttachmentList({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
       {attachments.map((att) => (
-        <a
-          key={att.id}
-          onClick={() => triggerDownload(att, message.error)}
-          style={{ fontSize: 13 }}
-        >
-          📎 {att.filename} <span style={{ color: 'var(--subtle)' }}>({fmtSize(att.filesize)})</span>
-        </a>
+        <div key={att.id} className="att-row">
+          <a onClick={() => triggerDownload(att, message.error)} style={{ fontSize: 13 }}>
+            📎 {att.filename}{' '}
+            <span style={{ color: 'var(--subtle)' }}>({fmtSize(att.filesize)})</span>
+          </a>
+          <DeleteX att={att} />
+        </div>
       ))}
     </div>
   )
@@ -93,7 +124,7 @@ export function AttachmentsSection({ taskId, attachments, canEdit, onChanged }: 
         <span className="ic">📎</span>需求附件
       </div>
       {attachments.length === 0 && <span className="cd-empty">暂无附件</span>}
-      <AttachmentList attachments={attachments} />
+      <AttachmentList attachments={attachments} deletable={canEdit} onDeleted={onChanged} />
       {canEdit && (
         <Upload
           showUploadList={false}

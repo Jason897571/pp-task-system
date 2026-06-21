@@ -178,6 +178,9 @@ export const uploadFile = (
   return api.post<Attachment>('/files/upload', fd).then((r) => r.data)
 }
 
+export const deleteFile = (id: number) =>
+  api.delete<{ ok: boolean }>(`/files/${id}`).then((r) => r.data)
+
 // Download URL — used as an <a href>. Auth header is added by the interceptor only
 // for axios calls, so we fetch via axios blob and trigger a download.
 export const downloadFile = (id: number) =>
