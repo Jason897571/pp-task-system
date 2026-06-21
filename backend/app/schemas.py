@@ -197,6 +197,10 @@ class BoardIn(BaseModel):
     name: str
 
 
+class BoardReorderIn(BaseModel):
+    board_ids: list[int]
+
+
 class ColumnIn(BaseModel):
     name: str
     kind: str | None = None

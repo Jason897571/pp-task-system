@@ -151,6 +151,44 @@ def test_create_board_requires_super_admin(client, world):
     assert client.post("/api/boards", headers=sup, json={"name": "  "}).status_code == 400
 
 
+def test_delete_board_removes_cards(client, world):
+    sup = auth_header(client, "super", "pw")
+    admin = auth_header(client, "admin", "pw")
+    # new board + a task on it
+    board = client.post("/api/boards", headers=sup, json={"name": "临时看板"}).json()
+    task = client.post(
+        "/api/tasks",
+        headers=admin,
+        json={"title": "临时任务", "board_id": board["id"], "assignee_id": world["member"].id},
+    ).json()
+    # delete the board
+    r = client.delete(f"/api/boards/{board['id']}", headers=sup)
+    assert r.status_code == 200 and r.json()["ok"] is True
+    # board gone from list, and its task no longer fetchable
+    boards = client.get("/api/boards", headers=sup).json()
+    assert all(b["id"] != board["id"] for b in boards)
+    assert client.get(f"/api/tasks/{task['id']}", headers=sup).status_code == 404
+
+
+def test_delete_board_requires_super_admin(client, world):
+    admin = auth_header(client, "admin", "pw")
+    assert client.delete(f"/api/boards/{world['board'].id}", headers=admin).status_code == 403
+
+
+def test_reorder_boards(client, world):
+    sup = auth_header(client, "super", "pw")
+    b2 = client.post("/api/boards", headers=sup, json={"name": "看板二"}).json()
+    b3 = client.post("/api/boards", headers=sup, json={"name": "看板三"}).json()
+    desired = [b3["id"], world["board"].id, b2["id"]]
+    r = client.put("/api/boards/reorder", headers=sup, json={"board_ids": desired})
+    assert r.status_code == 200
+    order = [b["id"] for b in client.get("/api/boards", headers=sup).json()]
+    assert order == desired
+    # non-super forbidden
+    member = auth_header(client, "member", "pw")
+    assert client.put("/api/boards/reorder", headers=member, json={"board_ids": desired}).status_code == 403
+
+
 def test_super_admin_column_crud(client, world):
     sup = auth_header(client, "super", "pw")
     bid = world["board"].id

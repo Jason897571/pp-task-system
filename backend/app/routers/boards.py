@@ -1,11 +1,32 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user, require_super_admin
-from app.models import Board, BoardColumn, Task, User
-from app.schemas import BoardColumnOut, BoardIn, BoardOut, ColumnIn, ColumnUpdateIn
+from app.models import (
+    Attachment,
+    Board,
+    BoardColumn,
+    BoardVisibility,
+    Checklist,
+    ChecklistItem,
+    Deliverable,
+    Notification,
+    Task,
+    TaskActivity,
+    TaskApplication,
+    TaskTag,
+    User,
+)
+from app.schemas import (
+    BoardColumnOut,
+    BoardIn,
+    BoardOut,
+    BoardReorderIn,
+    ColumnIn,
+    ColumnUpdateIn,
+)
 from app.services import board_can_see, first_column, visible_board_ids
 
 router = APIRouter(prefix="/api", tags=["boards"])
@@ -47,6 +68,64 @@ def create_board(
     db.commit()
     db.refresh(board)
     return BoardOut.model_validate(board)
+
+
+@router.put("/boards/reorder")
+def reorder_boards(
+    body: BoardReorderIn,
+    user: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Set each board's position to its index in board_ids (drag-reorder)."""
+    for pos, bid in enumerate(body.board_ids):
+        board = db.get(Board, bid)
+        if board is not None:
+            board.position = pos
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/boards/{board_id}")
+def delete_board(
+    board_id: int,
+    user: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    board = db.get(Board, board_id)
+    if board is None:
+        raise HTTPException(status_code=404, detail="看板不存在")
+
+    task_ids = list(db.scalars(select(Task.id).where(Task.board_id == board_id)).all())
+    if task_ids:
+        deliverable_ids = list(
+            db.scalars(select(Deliverable.id).where(Deliverable.task_id.in_(task_ids))).all()
+        )
+        checklist_ids = list(
+            db.scalars(select(Checklist.id).where(Checklist.task_id.in_(task_ids))).all()
+        )
+        # delete card-dependent rows in FK-safe order (no DB-level cascade configured)
+        if checklist_ids:
+            db.execute(delete(ChecklistItem).where(ChecklistItem.checklist_id.in_(checklist_ids)))
+        db.execute(delete(Checklist).where(Checklist.task_id.in_(task_ids)))
+        attach_cond = (Attachment.owner_type == "task") & (Attachment.owner_id.in_(task_ids))
+        if deliverable_ids:
+            attach_cond = attach_cond | (
+                (Attachment.owner_type == "deliverable")
+                & (Attachment.owner_id.in_(deliverable_ids))
+            )
+        db.execute(delete(Attachment).where(attach_cond))
+        db.execute(delete(Deliverable).where(Deliverable.task_id.in_(task_ids)))
+        db.execute(delete(TaskApplication).where(TaskApplication.task_id.in_(task_ids)))
+        db.execute(delete(TaskTag).where(TaskTag.task_id.in_(task_ids)))
+        db.execute(delete(TaskActivity).where(TaskActivity.task_id.in_(task_ids)))
+        db.execute(delete(Notification).where(Notification.related_task_id.in_(task_ids)))
+        db.execute(delete(Task).where(Task.board_id == board_id))
+
+    db.execute(delete(BoardVisibility).where(BoardVisibility.board_id == board_id))
+    db.execute(delete(BoardColumn).where(BoardColumn.board_id == board_id))
+    db.delete(board)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/boards/{board_id}/columns", response_model=list[BoardColumnOut])

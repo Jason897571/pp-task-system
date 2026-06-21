@@ -1,10 +1,26 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Dropdown, Input, Modal, App as AntApp } from 'antd'
+import { Dropdown, Input, Modal, Popconfirm, App as AntApp } from 'antd'
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useAuth } from '../auth/AuthContext'
-import { createBoard, getBoards } from '../api/endpoints'
+import { createBoard, deleteBoard, getBoards, reorderBoards } from '../api/endpoints'
 import { errMessage } from '../api/client'
+import type { Board } from '../api/types'
 import { avatarColor, initial } from '../lib/badges'
 import { NotificationBell } from './NotificationBell'
 
@@ -30,6 +46,45 @@ export function AppShell() {
     },
     onError: (e) => message.error(errMessage(e)),
   })
+
+  const isSuper = user?.role === 'super_admin'
+
+  const deleteBoardM = useMutation({
+    mutationFn: (id: number) => deleteBoard(id),
+    onSuccess: (_r, id) => {
+      message.success('看板已删除')
+      const remaining = boards.filter((b) => b.id !== id)
+      qc.setQueryData<Board[]>(['boards'], remaining)
+      qc.invalidateQueries({ queryKey: ['boards'] })
+      if (activeBoardId === id) {
+        navigate(remaining.length ? `/board/${remaining[0].id}` : '/board')
+      }
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
+
+  const reorderM = useMutation({
+    mutationFn: (ids: number[]) => reorderBoards(ids),
+    onError: (e) => {
+      message.error(errMessage(e))
+      qc.invalidateQueries({ queryKey: ['boards'] })
+    },
+  })
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  )
+
+  const onBoardDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const oldIndex = boards.findIndex((b) => b.id === active.id)
+    const newIndex = boards.findIndex((b) => b.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    const next = arrayMove(boards, oldIndex, newIndex)
+    qc.setQueryData<Board[]>(['boards'], next) // optimistic
+    reorderM.mutate(next.map((b) => b.id))
+  }
 
   const activeBoardId = (() => {
     const m = location.pathname.match(/^\/board\/(\d+)/)
@@ -83,16 +138,39 @@ export function AppShell() {
       <div className="app-body">
         <div className="sidebar">
           <div className="grp">看板</div>
-          {boards.map((b) => (
-            <button
-              key={b.id}
-              className={`nav-item ${activeBoardId === b.id ? 'active' : ''}`}
-              onClick={() => navigate(`/board/${b.id}`)}
+          {isSuper ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={onBoardDragEnd}
             >
-              📋 {b.name}
-            </button>
-          ))}
-          {user?.role === 'super_admin' && (
+              <SortableContext
+                items={boards.map((b) => b.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {boards.map((b) => (
+                  <SortableBoardItem
+                    key={b.id}
+                    board={b}
+                    active={activeBoardId === b.id}
+                    onOpen={() => navigate(`/board/${b.id}`)}
+                    onDelete={() => deleteBoardM.mutate(b.id)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          ) : (
+            boards.map((b) => (
+              <button
+                key={b.id}
+                className={`nav-item ${activeBoardId === b.id ? 'active' : ''}`}
+                onClick={() => navigate(`/board/${b.id}`)}
+              >
+                📋 {b.name}
+              </button>
+            ))
+          )}
+          {isSuper && (
             <button className="nav-item" onClick={() => setNewBoardOpen(true)}>
               + 新建看板
             </button>
@@ -158,5 +236,54 @@ export function AppShell() {
         </div>
       </Modal>
     </>
+  )
+}
+
+interface SortableBoardItemProps {
+  board: Board
+  active: boolean
+  onOpen: () => void
+  onDelete: () => void
+}
+
+function SortableBoardItem({ board, active, onOpen, onDelete }: SortableBoardItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: board.id })
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    display: 'flex',
+    alignItems: 'center',
+  }
+  return (
+    <div ref={setNodeRef} style={style} className={`nav-item board-item ${active ? 'active' : ''}`}>
+      <span
+        style={{ flex: 1, cursor: 'grab', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}
+        onClick={onOpen}
+        {...attributes}
+        {...listeners}
+      >
+        📋 {board.name}
+      </span>
+      <Popconfirm
+        title="删除看板"
+        description={`确定删除「${board.name}」？其卡片将一并删除。`}
+        okText="删除"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+        onConfirm={onDelete}
+      >
+        <span
+          className="board-del"
+          title="删除看板"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{ padding: '0 4px', opacity: 0.6, cursor: 'pointer' }}
+        >
+          🗑
+        </span>
+      </Popconfirm>
+    </div>
   )
 }
