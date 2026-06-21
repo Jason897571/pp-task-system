@@ -129,6 +129,28 @@ def test_board_with_no_visibility_is_global(client, world):
     assert any(b["id"] == world["board"].id for b in boards)
 
 
+def test_create_board(client, world):
+    sup = auth_header(client, "super", "pw")
+    # super_admin creates a board -> comes back with the 4 default columns
+    r = client.post("/api/boards", headers=sup, json={"name": "合同看板"})
+    assert r.status_code == 200
+    board = r.json()
+    assert board["name"] == "合同看板"
+    cols = client.get(f"/api/boards/{board['id']}/columns", headers=sup).json()
+    assert [c["name"] for c in cols] == ["待办", "进行中", "待审核", "已完成"]
+    assert [c["kind"] for c in cols] == ["start", "doing", "review", "done"]
+    # it shows up in the board list
+    boards = client.get("/api/boards", headers=sup).json()
+    assert any(b["id"] == board["id"] for b in boards)
+
+
+def test_create_board_requires_super_admin(client, world):
+    admin = auth_header(client, "admin", "pw")
+    assert client.post("/api/boards", headers=admin, json={"name": "X"}).status_code == 403
+    sup = auth_header(client, "super", "pw")
+    assert client.post("/api/boards", headers=sup, json={"name": "  "}).status_code == 400
+
+
 def test_super_admin_column_crud(client, world):
     sup = auth_header(client, "super", "pw")
     bid = world["board"].id

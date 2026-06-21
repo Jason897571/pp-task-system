@@ -193,6 +193,10 @@ class AdminUserUpdateIn(BaseModel):
     is_active: bool | None = None
 
 
+class BoardIn(BaseModel):
+    name: str
+
+
 class ColumnIn(BaseModel):
     name: str
     kind: str | None = None

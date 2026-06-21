@@ -5,10 +5,18 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, require_super_admin
 from app.models import Board, BoardColumn, Task, User
-from app.schemas import BoardColumnOut, BoardOut, ColumnIn, ColumnUpdateIn
+from app.schemas import BoardColumnOut, BoardIn, BoardOut, ColumnIn, ColumnUpdateIn
 from app.services import board_can_see, first_column, visible_board_ids
 
 router = APIRouter(prefix="/api", tags=["boards"])
+
+# Default workflow columns a new board starts with (name, kind).
+DEFAULT_COLUMNS = [
+    ("待办", "start"),
+    ("进行中", "doing"),
+    ("待审核", "review"),
+    ("已完成", "done"),
+]
 
 
 @router.get("/boards", response_model=list[BoardOut])
@@ -19,6 +27,26 @@ def list_boards(user: User = Depends(get_current_user), db: Session = Depends(ge
         stmt = stmt.where(Board.id.in_(ids))
     rows = db.scalars(stmt).all()
     return [BoardOut.model_validate(b) for b in rows]
+
+
+@router.post("/boards", response_model=BoardOut)
+def create_board(
+    body: BoardIn,
+    user: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="看板名称不能为空")
+    next_pos = db.scalar(select(func.coalesce(func.max(Board.position), -1))) + 1
+    board = Board(name=name, position=next_pos)
+    db.add(board)
+    db.flush()
+    for pos, (col_name, kind) in enumerate(DEFAULT_COLUMNS):
+        db.add(BoardColumn(board_id=board.id, name=col_name, position=pos, kind=kind))
+    db.commit()
+    db.refresh(board)
+    return BoardOut.model_validate(board)
 
 
 @router.get("/boards/{board_id}/columns", response_model=list[BoardColumnOut])

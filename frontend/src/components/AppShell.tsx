@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Dropdown, Input } from 'antd'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Dropdown, Input, Modal, App as AntApp } from 'antd'
 import { useAuth } from '../auth/AuthContext'
-import { getBoards } from '../api/endpoints'
+import { createBoard, getBoards } from '../api/endpoints'
+import { errMessage } from '../api/client'
 import { avatarColor, initial } from '../lib/badges'
 import { NotificationBell } from './NotificationBell'
 
@@ -10,8 +12,24 @@ export function AppShell() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const qc = useQueryClient()
+  const { message } = AntApp.useApp()
 
   const { data: boards = [] } = useQuery({ queryKey: ['boards'], queryFn: getBoards })
+
+  const [newBoardOpen, setNewBoardOpen] = useState(false)
+  const [newBoardName, setNewBoardName] = useState('')
+  const createBoardM = useMutation({
+    mutationFn: () => createBoard(newBoardName.trim()),
+    onSuccess: (board) => {
+      message.success(`看板「${board.name}」已创建`)
+      qc.invalidateQueries({ queryKey: ['boards'] })
+      setNewBoardOpen(false)
+      setNewBoardName('')
+      navigate(`/board/${board.id}`)
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
 
   const activeBoardId = (() => {
     const m = location.pathname.match(/^\/board\/(\d+)/)
@@ -75,13 +93,7 @@ export function AppShell() {
             </button>
           ))}
           {user?.role === 'super_admin' && (
-            <button
-              className="nav-item"
-              onClick={() => {
-                // TODO: board CREATE is out of MVP scope (column edit is in).
-                alert('新建看板：本期暂未实现')
-              }}
-            >
+            <button className="nav-item" onClick={() => setNewBoardOpen(true)}>
               + 新建看板
             </button>
           )}
@@ -123,6 +135,28 @@ export function AppShell() {
           <Outlet />
         </div>
       </div>
+
+      <Modal
+        title="新建看板"
+        open={newBoardOpen}
+        onCancel={() => setNewBoardOpen(false)}
+        onOk={() => newBoardName.trim() && createBoardM.mutate()}
+        okText="创建"
+        cancelText="取消"
+        okButtonProps={{ disabled: !newBoardName.trim(), loading: createBoardM.isPending }}
+      >
+        <Input
+          placeholder="看板名称（如：合同看板）"
+          value={newBoardName}
+          onChange={(e) => setNewBoardName(e.target.value)}
+          onPressEnter={() => newBoardName.trim() && createBoardM.mutate()}
+          autoFocus
+          maxLength={40}
+        />
+        <div style={{ marginTop: 8, color: 'var(--text-dim)', fontSize: 12 }}>
+          将自动创建默认列：待办 → 进行中 → 待审核 → 已完成
+        </div>
+      </Modal>
     </>
   )
 }

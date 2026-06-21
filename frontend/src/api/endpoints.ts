@@ -42,6 +42,9 @@ export const getMe = () => api.get<MeUser>('/auth/me').then((r) => r.data)
 // --- Boards / Columns ---
 export const getBoards = () => api.get<Board[]>('/boards').then((r) => r.data)
 
+export const createBoard = (name: string) =>
+  api.post<Board>('/boards', { name }).then((r) => r.data)
+
 export const getColumns = (boardId: number) =>
   api.get<BoardColumn[]>(`/boards/${boardId}/columns`).then((r) => r.data)
 
