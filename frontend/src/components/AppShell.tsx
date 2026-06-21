@@ -4,6 +4,7 @@ import { Dropdown, Input } from 'antd'
 import { useAuth } from '../auth/AuthContext'
 import { getBoards } from '../api/endpoints'
 import { avatarColor, initial } from '../lib/badges'
+import { NotificationBell } from './NotificationBell'
 
 export function AppShell() {
   const { user, logout } = useAuth()
@@ -19,6 +20,9 @@ export function AppShell() {
 
   const isPool = location.pathname.startsWith('/pool')
   const isAdmin = location.pathname.startsWith('/admin')
+  const isRecurring = location.pathname.startsWith('/recurring')
+  const isStats = location.pathname.startsWith('/stats')
+  const isManager = user?.role === 'admin' || user?.role === 'super_admin'
 
   return (
     <>
@@ -35,6 +39,7 @@ export function AppShell() {
           // TODO: wire global search once backend supports a search endpoint.
         />
         <span className="spacer" />
+        <NotificationBell />
         {/* TODO: 创建 button opens a global task-create modal (deferred to per-column add). */}
         <Dropdown
           menu={{
@@ -88,6 +93,22 @@ export function AppShell() {
           >
             🫧 任务池
           </button>
+          {isManager && (
+            <>
+              <button
+                className={`nav-item ${isRecurring ? 'active' : ''}`}
+                onClick={() => navigate('/recurring')}
+              >
+                🔁 每周必做
+              </button>
+              <button
+                className={`nav-item ${isStats ? 'active' : ''}`}
+                onClick={() => navigate('/stats')}
+              >
+                📊 统计
+              </button>
+            </>
+          )}
           {user?.role === 'super_admin' && (
             <button
               className={`nav-item ${isAdmin ? 'active' : ''}`}

@@ -1,4 +1,19 @@
-import type { ColumnKind } from '../api/types'
+import type { ColumnKind, TagColor } from '../api/types'
+
+// 9-color label palette (spec §标签). Keys match the backend `color` field.
+export const TAG_COLORS: Record<TagColor, string> = {
+  green: '#4bce97',
+  yellow: '#f5cd47',
+  orange: '#fea362',
+  red: '#f87168',
+  purple: '#9f8fef',
+  blue: '#579dff',
+  sky: '#6cc3e0',
+  pink: '#e774bb',
+  gray: '#8c9bab',
+}
+
+export const TAG_COLOR_KEYS = Object.keys(TAG_COLORS) as TagColor[]
 
 export function initial(fullName: string): string {
   return fullName ? fullName.slice(-1) : '?'

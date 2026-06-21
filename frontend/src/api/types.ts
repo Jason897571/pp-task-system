@@ -50,6 +50,29 @@ export interface BoardColumn {
   kind: ColumnKind
 }
 
+// Round-2: 9-color label palette (color field uses these keys).
+export type TagColor =
+  | 'green'
+  | 'yellow'
+  | 'orange'
+  | 'red'
+  | 'purple'
+  | 'blue'
+  | 'sky'
+  | 'pink'
+  | 'gray'
+
+export interface Tag {
+  id: number
+  name: string
+  color: TagColor
+}
+
+export interface ChecklistStats {
+  done: number
+  total: number
+}
+
 export interface Task {
   id: number
   title: string
@@ -66,6 +89,20 @@ export interface Task {
   due_date: string | null
   created_at: string
   updated_at: string
+  // Round-2 additions (present on every Task the backend returns):
+  tags: Tag[]
+  checklist_stats: ChecklistStats
+}
+
+export interface Attachment {
+  id: number
+  owner_type: 'task' | 'deliverable'
+  owner_id: number
+  filename: string
+  filesize: number
+  content_type: string
+  uploader: User
+  created_at: string
 }
 
 export interface Deliverable {
@@ -73,6 +110,7 @@ export interface Deliverable {
   submitter: User
   note: string
   created_at: string
+  attachments: Attachment[]
 }
 
 export interface Application {
@@ -81,9 +119,78 @@ export interface Application {
   created_at: string
 }
 
+export interface ChecklistItem {
+  id: number
+  content: string
+  is_done: boolean
+  position: number
+}
+
+export interface Checklist {
+  id: number
+  title: string
+  position: number
+  items: ChecklistItem[]
+}
+
 export interface TaskDetail extends Task {
   deliverables: Deliverable[]
   applications: Application[]
+  checklists: Checklist[]
+  attachments: Attachment[]
+}
+
+// Round-2: 每周必做 (recurring) templates.
+export interface RecurringTask {
+  id: number
+  title: string
+  description: string
+  priority: Priority
+  day_of_week: number // 0=周一 … 6=周日
+  is_active: boolean
+  assignees: User[]
+}
+
+export interface CreateRecurringBody {
+  title: string
+  description?: string
+  priority?: Priority
+  day_of_week?: number
+  assignee_ids: number[]
+}
+
+export interface UpdateRecurringBody {
+  title?: string
+  description?: string
+  priority?: Priority
+  day_of_week?: number
+  is_active?: boolean
+  assignee_ids?: number[]
+}
+
+// Round-2: 通知 (notifications).
+export interface Notification {
+  id: number
+  type: string
+  message: string
+  related_task_id: number | null
+  is_read: boolean
+  created_at: string
+}
+
+// Round-2: 统计 (stats).
+export interface StatsOverview {
+  by_column: { column_id: number; name: string; count: number }[]
+  pool_count: number
+  overdue_count: number
+}
+
+export interface MemberStats {
+  user: User
+  total: number
+  done: number
+  in_review: number
+  overdue: number
 }
 
 export interface AuthResponse {

@@ -17,6 +17,17 @@ import type {
   AdminUser,
   UpdateUserBody,
   User,
+  Tag,
+  TagColor,
+  Checklist,
+  ChecklistItem,
+  Attachment,
+  RecurringTask,
+  CreateRecurringBody,
+  UpdateRecurringBody,
+  Notification,
+  StatsOverview,
+  MemberStats,
 } from './types'
 
 // --- Auth ---
@@ -100,3 +111,83 @@ export const createUser = (body: CreateUserBody) =>
 
 export const updateUser = (id: number, body: UpdateUserBody) =>
   api.put<AdminUser>(`/admin/users/${id}`, body).then((r) => r.data)
+
+// --- Tags ---
+export const getTags = () => api.get<Tag[]>('/tags').then((r) => r.data)
+
+export const createTag = (body: { name: string; color: TagColor }) =>
+  api.post<Tag>('/tags', body).then((r) => r.data)
+
+export const setTaskTags = (taskId: number, tag_ids: number[]) =>
+  api.put<Tag[]>(`/tasks/${taskId}/tags`, { tag_ids }).then((r) => r.data)
+
+// --- Checklists ---
+export const createChecklist = (taskId: number, title: string) =>
+  api.post<Checklist>(`/tasks/${taskId}/checklists`, { title }).then((r) => r.data)
+
+export const updateChecklist = (cid: number, body: { title?: string; position?: number }) =>
+  api.put<Checklist>(`/checklists/${cid}`, body).then((r) => r.data)
+
+export const deleteChecklist = (cid: number) =>
+  api.delete<{ ok: boolean }>(`/checklists/${cid}`).then((r) => r.data)
+
+export const createChecklistItem = (cid: number, content: string) =>
+  api.post<ChecklistItem>(`/checklists/${cid}/items`, { content }).then((r) => r.data)
+
+export const updateChecklistItem = (
+  iid: number,
+  body: { is_done?: boolean; content?: string; position?: number },
+) => api.put<ChecklistItem>(`/checklist-items/${iid}`, body).then((r) => r.data)
+
+export const deleteChecklistItem = (iid: number) =>
+  api.delete<{ ok: boolean }>(`/checklist-items/${iid}`).then((r) => r.data)
+
+// --- Files ---
+export const uploadFile = (
+  file: File,
+  ownerType: 'task' | 'deliverable',
+  ownerId: number,
+) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('owner_type', ownerType)
+  fd.append('owner_id', String(ownerId))
+  return api.post<Attachment>('/files/upload', fd).then((r) => r.data)
+}
+
+// Download URL — used as an <a href>. Auth header is added by the interceptor only
+// for axios calls, so we fetch via axios blob and trigger a download.
+export const downloadFile = (id: number) =>
+  api
+    .get<Blob>(`/files/${id}`, { responseType: 'blob' })
+    .then((r) => ({ blob: r.data, headers: r.headers }))
+
+// --- Recurring tasks ---
+export const getRecurringTasks = () =>
+  api.get<RecurringTask[]>('/recurring-tasks').then((r) => r.data)
+
+export const createRecurringTask = (body: CreateRecurringBody) =>
+  api.post<RecurringTask>('/recurring-tasks', body).then((r) => r.data)
+
+export const updateRecurringTask = (id: number, body: UpdateRecurringBody) =>
+  api.put<RecurringTask>(`/recurring-tasks/${id}`, body).then((r) => r.data)
+
+export const deleteRecurringTask = (id: number) =>
+  api.delete<{ ok: boolean }>(`/recurring-tasks/${id}`).then((r) => r.data)
+
+// --- Notifications ---
+export const getNotifications = () =>
+  api.get<Notification[]>('/notifications').then((r) => r.data)
+
+export const markNotificationRead = (id: number) =>
+  api.post<{ ok: boolean }>(`/notifications/${id}/read`).then((r) => r.data)
+
+export const markAllNotificationsRead = () =>
+  api.post<{ ok: boolean }>('/notifications/read-all').then((r) => r.data)
+
+// --- Stats ---
+export const getStatsOverview = (boardId: number) =>
+  api.get<StatsOverview>('/stats/overview', { params: { board_id: boardId } }).then((r) => r.data)
+
+export const getMemberStats = () =>
+  api.get<MemberStats[]>('/stats/members').then((r) => r.data)
