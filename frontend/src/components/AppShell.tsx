@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties } from 'react'
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dropdown, Input, Modal, Popconfirm, App as AntApp } from 'antd'
@@ -33,6 +33,21 @@ export function AppShell() {
   const { message } = AntApp.useApp()
 
   const { data: boards = [] } = useQuery({ queryKey: ['boards'], queryFn: getBoards })
+
+  // Search: local state drives the input (so IME composition isn't interrupted by
+  // a value reset); the query is pushed to ?q= only when not mid-composition.
+  const [searchText, setSearchText] = useState(searchParams.get('q') ?? '')
+  const composing = useRef(false)
+  const pushQuery = (q: string) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (q) next.set('q', q)
+        else next.delete('q')
+        return next
+      },
+      { replace: true },
+    )
 
   const [newBoardOpen, setNewBoardOpen] = useState(false)
   const [newBoardName, setNewBoardName] = useState('')
@@ -111,18 +126,20 @@ export function AppShell() {
           style={{ width: 260, marginLeft: 10 }}
           size="small"
           allowClear
-          value={searchParams.get('q') ?? ''}
+          value={searchText}
           onChange={(e) => {
-            const q = e.target.value
-            setSearchParams(
-              (prev) => {
-                const next = new URLSearchParams(prev)
-                if (q) next.set('q', q)
-                else next.delete('q')
-                return next
-              },
-              { replace: true },
-            )
+            const v = e.target.value
+            setSearchText(v)
+            // While an IME is composing, hold off pushing to the URL (it would
+            // re-render and break composition). compositionEnd flushes it.
+            if (!composing.current) pushQuery(v)
+          }}
+          onCompositionStart={() => {
+            composing.current = true
+          }}
+          onCompositionEnd={(e) => {
+            composing.current = false
+            pushQuery((e.target as HTMLInputElement).value)
           }}
         />
         <span className="spacer" />
