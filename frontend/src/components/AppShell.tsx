@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dropdown, Input, Modal, Popconfirm, App as AntApp } from 'antd'
 import {
@@ -28,6 +28,7 @@ export function AppShell() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const qc = useQueryClient()
   const { message } = AntApp.useApp()
 
@@ -106,10 +107,23 @@ export function AppShell() {
         </span>
         <Input
           className="topbar-search"
-          placeholder="搜索卡片 / 负责人"
-          style={{ width: 240, marginLeft: 10 }}
+          placeholder="搜索当前看板：卡片 / 负责人"
+          style={{ width: 260, marginLeft: 10 }}
           size="small"
-          // TODO: wire global search once backend supports a search endpoint.
+          allowClear
+          value={searchParams.get('q') ?? ''}
+          onChange={(e) => {
+            const q = e.target.value
+            setSearchParams(
+              (prev) => {
+                const next = new URLSearchParams(prev)
+                if (q) next.set('q', q)
+                else next.delete('q')
+                return next
+              },
+              { replace: true },
+            )
+          }}
         />
         <span className="spacer" />
         <NotificationBell />

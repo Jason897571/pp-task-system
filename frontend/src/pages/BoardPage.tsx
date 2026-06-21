@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   DndContext,
   PointerSensor,
@@ -28,6 +28,8 @@ import type { BoardColumn, Task } from '../api/types'
 
 export function BoardPage() {
   const { boardId: boardIdParam, taskId: taskIdParam } = useParams()
+  const [searchParams] = useSearchParams()
+  const q = (searchParams.get('q') ?? '').trim().toLowerCase()
   const navigate = useNavigate()
   const { user } = useAuth()
   const { message } = AntApp.useApp()
@@ -137,10 +139,22 @@ export function BoardPage() {
 
   const sorted = [...columns].sort((a, b) => a.position - b.position)
 
+  // Top-bar search (?q=) filters the current board's cards by title or assignee.
+  const matchesSearch = (t: Task) =>
+    !q ||
+    t.title.toLowerCase().includes(q) ||
+    (t.assignee?.full_name.toLowerCase().includes(q) ?? false)
+  const visibleTasks = tasks.filter(matchesSearch)
+
   return (
     <>
       <div className="board-header">
         <span className="title">{board ? `📋 ${board.name}` : '看板'}</span>
+        {q && (
+          <span style={{ fontSize: 13, color: '#aab2c8', fontWeight: 500 }}>
+            🔍 “{q}” · 命中 {visibleTasks.length} 张卡
+          </span>
+        )}
       </div>
 
       {colsLoading || tasksLoading ? (
@@ -158,7 +172,7 @@ export function BoardPage() {
               <BoardColumnView
                 key={col.id}
                 col={col}
-                tasks={tasks.filter((t) => t.column_id === col.id)}
+                tasks={visibleTasks.filter((t) => t.column_id === col.id)}
                 me={{ id: user!.id, role: user!.role }}
                 isSuperAdmin={isSuperAdmin}
                 onOpenCard={openCard}
