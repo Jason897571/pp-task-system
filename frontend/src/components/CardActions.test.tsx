@@ -21,6 +21,7 @@ function makeTask(over: Partial<TaskDetail>): TaskDetail {
     priority: 'normal',
     is_mandatory: false,
     due_date: null,
+    deleted_at: null,
     created_at: '',
     updated_at: '',
     tags: [],
@@ -33,12 +34,18 @@ function makeTask(over: Partial<TaskDetail>): TaskDetail {
   }
 }
 
-function renderActions(task: TaskDetail, columnKind: ColumnKind, me: Pick<User, 'id' | 'role'>) {
+function renderActions(
+  task: TaskDetail,
+  columnKind: ColumnKind,
+  me: Pick<User, 'id' | 'role'>,
+  requiresReview = false,
+) {
   return render(
     <AntApp>
       <CardActions
         task={task}
         columnKind={columnKind}
+        requiresReview={requiresReview}
         me={me}
         onStart={noop}
         onSubmit={noop}
@@ -69,9 +76,9 @@ describe('CardActions rendering', () => {
     expect(screen.getByText('无可用动作')).toBeInTheDocument()
   })
 
-  it('admin sees 审核 buttons only in review column', () => {
+  it('admin sees 审核 buttons only in a requires-review column', () => {
     const task = makeTask({})
-    const { container } = renderActions(task, 'review', admin)
+    const { container } = renderActions(task, 'review', admin, true)
     expect(container.querySelector('[data-action="review-approve"]')).toBeInTheDocument()
     expect(container.querySelector('[data-action="review-reject"]')).toBeInTheDocument()
   })

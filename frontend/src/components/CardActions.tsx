@@ -7,6 +7,7 @@ import type { ActionKey } from '../lib/actions'
 interface Props {
   task: TaskDetail
   columnKind: import('../api/types').ColumnKind
+  requiresReview?: boolean
   me: Pick<User, 'id' | 'role'>
   // Candidate assignees for admin assign/approve (members + self). Optional.
   assignableUsers?: User[]
@@ -31,9 +32,9 @@ const LABELS: Record<ActionKey, string> = {
 
 // Renders the role+column-gated action buttons (spec §9). data-action attrs aid testing.
 export function CardActions(props: Props) {
-  const { task, columnKind, me, busy } = props
+  const { task, columnKind, requiresReview, me, busy } = props
   const { message } = AntApp.useApp()
-  const actions = visibleActions({ task, columnKind, me })
+  const actions = visibleActions({ task, columnKind, requiresReview, me })
 
   const [reviewRejectOpen, setReviewRejectOpen] = useState(false)
   const [reviewComment, setReviewComment] = useState('')

@@ -23,6 +23,7 @@ export interface MeUser extends User {
 export interface AdminUser extends User {
   account_status: AccountStatus
   username: string | null
+  invite_code: string | null
 }
 
 // Returned by POST /admin/users — includes the one-time invite code.
@@ -40,6 +41,7 @@ export interface Board {
   id: number
   name: string
   position: number
+  icon: string | null
   is_archive: boolean
 }
 
@@ -57,6 +59,7 @@ export interface BoardColumn {
   position: number
   kind: ColumnKind
   is_final: boolean
+  requires_review: boolean
 }
 
 // Round-2: 9-color label palette (color field uses these keys).
@@ -96,6 +99,7 @@ export interface Task {
   priority: Priority
   is_mandatory: boolean
   due_date: string | null
+  deleted_at: string | null
   created_at: string
   updated_at: string
   // Round-2 additions (present on every Task the backend returns):

@@ -11,7 +11,11 @@ from datetime import date
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.database import SessionLocal
-from app.services import archive_completed_tasks, generate_recurring_instances
+from app.services import (
+    archive_completed_tasks,
+    generate_recurring_instances,
+    purge_expired_trash,
+)
 
 _scheduler: BackgroundScheduler | None = None
 
@@ -20,6 +24,7 @@ def _daily_job() -> None:
     db = SessionLocal()
     try:
         generate_recurring_instances(db, date.today())
+        purge_expired_trash(db)
         db.commit()
     finally:
         db.close()

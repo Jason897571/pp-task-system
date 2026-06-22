@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 
 class UserOut(BaseModel):
@@ -32,6 +32,7 @@ class BoardOut(BaseModel):
     id: int
     name: str
     position: int
+    icon: str | None = None
     is_archive: bool = False
 
 
@@ -44,6 +45,7 @@ class BoardColumnOut(BaseModel):
     position: int
     kind: str | None
     is_final: bool = False
+    requires_review: bool = False
 
 
 class TagOut(BaseModel):
@@ -75,10 +77,22 @@ class TaskOut(BaseModel):
     priority: str
     is_mandatory: bool
     due_date: datetime | None
+    deleted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     tags: list[TagOut] = []
     checklist_stats: ChecklistStats = ChecklistStats(done=0, total=0)
+
+    @field_serializer("due_date", "deleted_at")
+    def _serialize_utc(self, v: datetime | None) -> str | None:
+        # due_date / deleted_at are stored naive-UTC. Mark them UTC on the way out
+        # so the browser converts to local time instead of reading the bare string
+        # as local. (created_at/updated_at use DB-local func.now(); left untouched.)
+        if v is None:
+            return None
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v.isoformat()
 
 
 class AttachmentOut(BaseModel):
@@ -187,6 +201,7 @@ class AdminUserListOut(BaseModel):
     department_id: int | None
     account_status: str
     username: str | None
+    invite_code: str | None = None
 
 
 class AdminUserUpdateIn(BaseModel):
@@ -197,6 +212,11 @@ class AdminUserUpdateIn(BaseModel):
 
 class BoardIn(BaseModel):
     name: str
+
+
+class BoardUpdateIn(BaseModel):
+    name: str | None = None
+    icon: str | None = None
 
 
 class BoardReorderIn(BaseModel):
@@ -218,6 +238,7 @@ class ColumnUpdateIn(BaseModel):
     kind: str | None = None
     position: int | None = None
     is_final: bool | None = None
+    requires_review: bool | None = None
 
 
 class TaskIn(BaseModel):

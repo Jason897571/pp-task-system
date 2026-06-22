@@ -24,7 +24,7 @@ def list_pool(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    stmt = select(Task).where(Task.lifecycle == "open")
+    stmt = select(Task).where(Task.lifecycle == "open", Task.deleted_at.is_(None))
     if board_id is not None:
         stmt = stmt.where(Task.board_id == board_id)
 

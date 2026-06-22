@@ -55,6 +55,9 @@ class Board(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     position: Mapped[int] = mapped_column(Integer, default=0)
+    # Emoji shown before the board name in the sidebar; super_admin picks it.
+    # NULL falls back to 📋 on the frontend.
+    icon: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # The single global archive board that completed cards are swept into weekly.
     is_archive: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -75,6 +78,10 @@ class BoardColumn(Base):
     # super_admin marks one column per board as the final acceptance stage. Cards
     # here count as completed and are auto-archived every Saturday.
     is_final: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # super_admin marks at most one column per board as the review gate. A member's
+    # 提交 lands the card here to await admin approval; if no column requires review
+    # the card goes straight to the done column.
+    requires_review: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
     board: Mapped[Board] = relationship(back_populates="columns")
 
@@ -122,6 +129,8 @@ class Task(Base):
         ForeignKey("recurring_tasks.id"), nullable=True
     )
     due_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Soft delete: non-null = in the recycle bin (purged 30 days after this time).
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

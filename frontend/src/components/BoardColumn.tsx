@@ -60,6 +60,7 @@ interface Props {
   onRenameColumn: (colId: number, name: string) => void
   onDeleteColumn: (colId: number) => void
   onSetFinal: (colId: number, isFinal: boolean) => void
+  onSetReview: (colId: number, requiresReview: boolean) => void
   onRestore?: (task: Task) => void
 }
 
@@ -73,6 +74,7 @@ export function BoardColumnView({
   onRenameColumn,
   onDeleteColumn,
   onSetFinal,
+  onSetReview,
   onRestore,
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id, data: { col } })
@@ -113,6 +115,11 @@ export function BoardColumnView({
         ) : (
           <>
             <span>{col.name}</span>
+            {col.requires_review && (
+              <span className="col-review-tag" title="审核节点：成员提交后卡片在此等待管理员审核">
+                🔒 审核
+              </span>
+            )}
             {col.is_final && (
               <span className="col-final-tag" title="最终验收完成列：卡片视为完成，周六自动归档">
                 ✓ 最终验收
@@ -126,6 +133,11 @@ export function BoardColumnView({
                 menu={{
                   items: [
                     { key: 'rename', label: '改列名', onClick: () => setRenaming(true) },
+                    {
+                      key: 'review',
+                      label: col.requires_review ? '取消审核节点' : '设为审核节点',
+                      onClick: () => onSetReview(col.id, !col.requires_review),
+                    },
                     {
                       key: 'final',
                       label: col.is_final ? '取消最终验收' : '设为最终验收完成',

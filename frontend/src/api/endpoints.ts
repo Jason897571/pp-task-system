@@ -46,6 +46,9 @@ export const getBoards = () => api.get<Board[]>('/boards').then((r) => r.data)
 export const createBoard = (name: string) =>
   api.post<Board>('/boards', { name }).then((r) => r.data)
 
+export const updateBoard = (id: number, body: { name?: string; icon?: string }) =>
+  api.put<Board>(`/boards/${id}`, body).then((r) => r.data)
+
 export const deleteBoard = (id: number) =>
   api.delete<{ ok: boolean }>(`/boards/${id}`).then((r) => r.data)
 
@@ -68,7 +71,7 @@ export const createColumn = (boardId: number, body: { name: string; kind: Column
 
 export const updateColumn = (
   cid: number,
-  body: { name?: string; kind?: ColumnKind; position?: number; is_final?: boolean },
+  body: { name?: string; kind?: ColumnKind; position?: number; is_final?: boolean; requires_review?: boolean },
 ) => api.put<BoardColumn>(`/columns/${cid}`, body).then((r) => r.data)
 
 export const deleteColumn = (cid: number) =>
@@ -94,6 +97,18 @@ export const createTask = (body: CreateTaskBody) =>
 
 export const moveTask = (id: number, column_id: number) =>
   api.post<Task>(`/tasks/${id}/move`, { column_id }).then((r) => r.data)
+
+// --- Recycle bin (admin/super) ---
+export const deleteTask = (id: number) =>
+  api.delete<{ ok: boolean }>(`/tasks/${id}`).then((r) => r.data)
+
+export const getTrash = () => api.get<Task[]>('/trash').then((r) => r.data)
+
+export const restoreCard = (id: number) =>
+  api.post<Task>(`/tasks/${id}/restore`).then((r) => r.data)
+
+export const purgeTask = (id: number) =>
+  api.delete<{ ok: boolean }>(`/tasks/${id}/purge`).then((r) => r.data)
 
 export const moveTaskToBoard = (id: number, board_id: number, column_id: number) =>
   api.post<Task>(`/tasks/${id}/move-to-board`, { board_id, column_id }).then((r) => r.data)

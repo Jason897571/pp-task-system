@@ -135,6 +135,18 @@ function UsersTab() {
           },
           { title: '状态', dataIndex: 'account_status' },
           {
+            title: '邀请码',
+            key: 'invite_code',
+            render: (_: unknown, r: AdminUser) =>
+              r.invite_code ? (
+                <Typography.Text copyable code>
+                  {r.invite_code}
+                </Typography.Text>
+              ) : (
+                <span style={{ color: 'var(--subtle)' }}>—</span>
+              ),
+          },
+          {
             title: '启用',
             key: 'active',
             render: (_: unknown, r: AdminUser) => (

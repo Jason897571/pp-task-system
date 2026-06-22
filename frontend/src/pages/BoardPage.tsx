@@ -139,6 +139,16 @@ export function BoardPage() {
     onError: (e) => message.error(errMessage(e)),
   })
 
+  const setReviewM = useMutation({
+    mutationFn: ({ colId, requiresReview }: { colId: number; requiresReview: boolean }) =>
+      updateColumn(colId, { requires_review: requiresReview }),
+    onSuccess: (_d, { requiresReview }) => {
+      message.success(requiresReview ? '已设为审核节点' : '已取消审核节点')
+      qc.invalidateQueries({ queryKey: ['columns', boardId] })
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
+
   const archiveM = useMutation({
     mutationFn: archiveNow,
     onSuccess: ({ archived }) => {
@@ -152,8 +162,10 @@ export function BoardPage() {
     const task = e.active.data.current?.task as Task | undefined
     const targetCol = e.over?.data.current?.col as BoardColumn | undefined
     if (!task || !targetCol || task.column_id === targetCol.id) return
-    if (!canDropInto(targetCol.kind)) {
-      message.warning('不能直接拖入完成列，需经审核')
+    const boardHasReview = columns.some((c) => c.requires_review)
+    const drop = canDropInto(targetCol, { role: user!.role, boardHasReview })
+    if (!drop.ok) {
+      message.warning(drop.reason ?? '无法移动到该列')
       return
     }
     moveM.mutate({ id: task.id, columnId: targetCol.id })
@@ -182,7 +194,7 @@ export function BoardPage() {
     <>
       <div className="board-header">
         <span className="title">
-          {board ? `${isArchive ? '🗄️' : '📋'} ${board.name}` : '看板'}
+          {board ? `${isArchive ? '🗄️' : board.icon || '📋'} ${board.name}` : '看板'}
         </span>
         {q && (
           <span style={{ fontSize: 13, color: '#aab2c8', fontWeight: 500 }}>
@@ -220,6 +232,7 @@ export function BoardPage() {
                 onRenameColumn={(colId, name) => renameColM.mutate({ colId, name })}
                 onDeleteColumn={(colId) => deleteColM.mutate(colId)}
                 onSetFinal={(colId, isFinal) => setFinalM.mutate({ colId, isFinal })}
+                onSetReview={(colId, requiresReview) => setReviewM.mutate({ colId, requiresReview })}
                 onRestore={isArchive && isManager ? setRestoreTask : undefined}
               />
             ))}

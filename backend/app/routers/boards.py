@@ -26,6 +26,7 @@ from app.schemas import (
     BoardMemberVisibilityIn,
     BoardOut,
     BoardReorderIn,
+    BoardUpdateIn,
     ColumnIn,
     ColumnUpdateIn,
 )
@@ -76,7 +77,10 @@ def create_board(
     db.add(board)
     db.flush()
     for pos, (col_name, kind) in enumerate(DEFAULT_COLUMNS):
-        db.add(BoardColumn(board_id=board.id, name=col_name, position=pos, kind=kind))
+        db.add(BoardColumn(
+            board_id=board.id, name=col_name, position=pos, kind=kind,
+            requires_review=(kind == "review"),
+        ))
     db.commit()
     db.refresh(board)
     return BoardOut.model_validate(board)
@@ -95,6 +99,28 @@ def reorder_boards(
             board.position = pos
     db.commit()
     return {"ok": True}
+
+
+@router.put("/boards/{board_id}", response_model=BoardOut)
+def update_board(
+    board_id: int,
+    body: BoardUpdateIn,
+    user: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    board = db.get(Board, board_id)
+    if board is None:
+        raise HTTPException(status_code=404, detail="看板不存在")
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="看板名称不能为空")
+        board.name = name
+    if body.icon is not None:
+        board.icon = body.icon.strip() or None
+    db.commit()
+    db.refresh(board)
+    return BoardOut.model_validate(board)
 
 
 @router.get("/boards/visibility-matrix")
@@ -265,6 +291,14 @@ def update_column(
             ).all():
                 sibling.is_final = False
         col.is_final = body.is_final
+    if body.requires_review is not None:
+        if body.requires_review:
+            # At most one review column per board — clear the flag on siblings.
+            for sibling in db.scalars(
+                select(BoardColumn).where(BoardColumn.board_id == col.board_id)
+            ).all():
+                sibling.requires_review = False
+        col.requires_review = body.requires_review
     db.commit()
     db.refresh(col)
     return BoardColumnOut.model_validate(col)

@@ -27,7 +27,10 @@ def make_board_with_columns(db, name="任务看板"):
     for i, (cname, kind) in enumerate(
         [("待办", "start"), ("进行中", "doing"), ("待审核", "review"), ("已完成", "done")]
     ):
-        c = BoardColumn(board_id=board.id, name=cname, position=i, kind=kind)
+        c = BoardColumn(
+            board_id=board.id, name=cname, position=i, kind=kind,
+            requires_review=(kind == "review"),
+        )
         db.add(c)
         db.flush()
         cols[kind] = c

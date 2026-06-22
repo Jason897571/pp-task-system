@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, DatePicker, Input, Modal, Select, Spin, Upload, App as AntApp } from 'antd'
+import { Button, DatePicker, Input, Modal, Popconfirm, Select, Spin, Upload, App as AntApp } from 'antd'
 import type { UploadFile } from 'antd'
 import dayjs from 'dayjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -7,6 +7,7 @@ import {
   applyTask,
   approveTask,
   assignTask,
+  deleteTask,
   getAssignableUsers,
   getTask,
   reviewTask,
@@ -98,6 +99,15 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
     mutationFn: (body: { description?: string; due_date?: string | null; priority?: string }) =>
       updateTask(taskId, body),
   })
+  const deleteM = useMutation({
+    mutationFn: () => deleteTask(taskId),
+    onSuccess: () => {
+      message.success('已移入回收箱')
+      invalidate()
+      onClose()
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
 
   const busy =
     startM.isPending ||
@@ -115,6 +125,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
 
   const column = task ? columns.find((c) => c.id === task.column_id) ?? null : null
   const columnKind = column?.kind ?? null
+  const requiresReview = column?.requires_review ?? false
 
   // Edit permission for tags/checklists/attachments: admin/super_admin or assignee.
   const isManager = user?.role === 'admin' || user?.role === 'super_admin'
@@ -163,12 +174,13 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
   }
 
   const due = task ? dueState(task.due_date, columnKind) : null
-  const status = task ? deliverStatus(columnKind, task.is_rework) : null
+  const status = task ? deliverStatus(columnKind, task.is_rework, requiresReview) : null
 
   const cardActions = task && user && (
     <CardActions
       task={task}
       columnKind={columnKind}
+      requiresReview={requiresReview}
       me={{ id: user.id, role: user.role }}
       assignableUsers={assignableUsers(users, task.applications.map((a) => a.applicant))}
       busy={busy}
@@ -449,6 +461,23 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
             )}
 
             {cardActions && <div className="cm-actions">{cardActions}</div>}
+
+            {isManager && (
+              <div className="cm-actions" style={{ marginTop: 8 }}>
+                <Popconfirm
+                  title="删除卡片？"
+                  description="卡片将移入回收箱，保留 30 天，可随时恢复。"
+                  okText="删除"
+                  cancelText="取消"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => deleteM.mutate()}
+                >
+                  <Button danger block loading={deleteM.isPending}>
+                    🗑 删除卡片
+                  </Button>
+                </Popconfirm>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -461,8 +490,9 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
 function deliverStatus(
   kind: string | null,
   rework: boolean,
+  requiresReview: boolean,
 ): { label: string; short: string; cls: string; tlcls: string } | null {
-  if (kind === 'review') return { label: '⏳ 待审核中', short: '待审核', cls: 'wait', tlcls: '' }
+  if (requiresReview) return { label: '⏳ 待审核中', short: '待审核', cls: 'wait', tlcls: '' }
   if (kind === 'done') return { label: '✓ 已通过 · 已完成', short: '已通过', cls: 'ok', tlcls: 'ok' }
   if (kind === 'doing' && rework)
     return { label: '↩ 已打回 · 待重新提交', short: '已打回', cls: 'rej', tlcls: 'rej' }

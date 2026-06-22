@@ -29,7 +29,7 @@ export function LoginPage() {
     <div className="auth-wrap">
       <div className="auth-card">
         <Typography.Title level={3} style={{ marginTop: 0 }}>
-          任务系统
+          PP API任务系统
         </Typography.Title>
         <Typography.Text type="secondary">登录以继续</Typography.Text>
         <Form layout="vertical" onFinish={onFinish} style={{ marginTop: 16 }}>

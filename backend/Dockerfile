@@ -7,9 +7,12 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install dependencies first for better layer caching
+# Install dependencies first for better layer caching.
+# Default to the Aliyun PyPI mirror (fast inside China); override with
+#   docker compose build --build-arg PIP_INDEX_URL=https://pypi.org/simple/
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 COPY requirements.txt ./
-RUN pip install -r requirements.txt
+RUN pip install -i ${PIP_INDEX_URL} -r requirements.txt
 
 # App code (alembic.ini + alembic/ are needed for migrations on boot)
 COPY app ./app

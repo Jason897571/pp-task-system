@@ -9,6 +9,7 @@ import { PoolPage } from './pages/PoolPage'
 import { AdminPage } from './pages/AdminPage'
 import { RecurringPage } from './pages/RecurringPage'
 import { StatsPage } from './pages/StatsPage'
+import { TrashPage } from './pages/TrashPage'
 
 function FullScreenSpin() {
   return (
@@ -73,6 +74,14 @@ export function AppRoutes() {
           element={
             <RequireManager>
               <StatsPage />
+            </RequireManager>
+          }
+        />
+        <Route
+          path="/trash"
+          element={
+            <RequireManager>
+              <TrashPage />
             </RequireManager>
           }
         />

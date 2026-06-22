@@ -35,7 +35,11 @@ def overview(
 
     # per-column counts for on-board tasks; dept filter lives in the join
     # condition so columns with zero matching tasks still appear (count 0).
-    cond = (Task.column_id == BoardColumn.id) & (Task.lifecycle == "on_board")
+    cond = (
+        (Task.column_id == BoardColumn.id)
+        & (Task.lifecycle == "on_board")
+        & (Task.deleted_at.is_(None))
+    )
     if user.role != "super_admin":
         cond = cond & (Task.department_id == user.department_id)
     col_stmt = (
@@ -54,7 +58,10 @@ def overview(
     ]
 
     pool_stmt = _dept_scope(
-        select(func.count(Task.id)).where(Task.lifecycle == "open"), user
+        select(func.count(Task.id)).where(
+            Task.lifecycle == "open", Task.deleted_at.is_(None)
+        ),
+        user,
     )
     if board_id is not None:
         pool_stmt = pool_stmt.where(Task.board_id == board_id)
@@ -65,6 +72,7 @@ def overview(
     overdue_stmt = _dept_scope(
         select(func.count(Task.id)).where(
             Task.lifecycle == "on_board",
+            Task.deleted_at.is_(None),
             Task.due_date.is_not(None),
             Task.due_date < now,
             Task.column_id.not_in(done_col_ids),
@@ -103,7 +111,9 @@ def members(
     results = []
     for p in people:
         base = select(func.count(Task.id)).where(
-            Task.assignee_id == p.id, Task.lifecycle == "on_board"
+            Task.assignee_id == p.id,
+            Task.lifecycle == "on_board",
+            Task.deleted_at.is_(None),
         )
         total = db.scalar(base) or 0
         done = db.scalar(base.where(Task.column_id.in_(done_col_ids))) or 0

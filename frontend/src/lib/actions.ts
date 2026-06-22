@@ -1,6 +1,6 @@
 // Role + column-kind gated action visibility. This is the spec's key concern (§9)
 // and the table under "角色动作显隐" in API_CONTRACT.md. Tested directly.
-import type { ColumnKind, Role, Task, User } from '../api/types'
+import type { BoardColumn, ColumnKind, Role, Task, User } from '../api/types'
 
 export type ActionKey =
   | 'start' // member: start-kind & is assignee
@@ -14,13 +14,14 @@ export type ActionKey =
 export interface ActionContext {
   task: Pick<Task, 'lifecycle' | 'assignee'>
   columnKind: ColumnKind // kind of the task's current column (null if not on board)
+  requiresReview?: boolean // task's current column is the board's review gate
   me: Pick<User, 'id' | 'role'>
 }
 
 const isAssignee = (task: ActionContext['task'], meId: number) =>
   task.assignee?.id === meId
 
-export function visibleActions({ task, columnKind, me }: ActionContext): ActionKey[] {
+export function visibleActions({ task, columnKind, requiresReview, me }: ActionContext): ActionKey[] {
   const actions: ActionKey[] = []
   const role: Role = me.role
 
@@ -37,7 +38,7 @@ export function visibleActions({ task, columnKind, me }: ActionContext): ActionK
     if (task.lifecycle === 'open') actions.push('assign_pool')
     if (task.lifecycle === 'pending_approval') actions.push('approve')
     if (task.lifecycle === 'on_board') {
-      if (columnKind === 'review') actions.push('review')
+      if (requiresReview) actions.push('review')
       actions.push('assign_board') // 指派/转派 on any on-board card
     }
     return actions
@@ -57,6 +58,15 @@ export function canDrag(
   return true // admin / super_admin
 }
 
-export function canDropInto(targetKind: ColumnKind): boolean {
-  return targetKind !== 'done'
+// Drag-drop rule. Completion must pass review ONLY when the board has a review
+// gate; otherwise cards move freely. Admin/super always move anywhere.
+export function canDropInto(
+  target: Pick<BoardColumn, 'kind' | 'requires_review'>,
+  opts: { role: Role; boardHasReview: boolean },
+): { ok: boolean; reason?: string } {
+  if (opts.role !== 'member') return { ok: true }
+  if (target.kind === 'done' && opts.boardHasReview) {
+    return { ok: false, reason: '需经审核后才能完成' }
+  }
+  return { ok: true }
 }

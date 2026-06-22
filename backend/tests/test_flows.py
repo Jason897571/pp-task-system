@@ -670,3 +670,74 @@ def test_tasks_filter_by_board(client, world):
     tasks = client.get(f"/api/tasks?board_id={world['board'].id}", headers=admin).json()
     assert len(tasks) >= 1
     assert all(t["board_id"] == world["board"].id for t in tasks)
+
+
+# --------------------------------------------------------------------------
+# Recycle bin (soft delete -> restore / purge / 30-day auto-purge)
+# --------------------------------------------------------------------------
+
+
+def test_delete_card_goes_to_trash_and_hides_from_board(client, world):
+    admin = auth_header(client, "admin", "pw")
+    member = auth_header(client, "member", "pw")
+    t = _assigned_task(client, world)
+
+    r = client.delete(f"/api/tasks/{t['id']}", headers=admin)
+    assert r.status_code == 200
+
+    # gone from the board list
+    tasks = client.get(f"/api/tasks?board_id={world['board'].id}", headers=admin).json()
+    assert all(x["id"] != t["id"] for x in tasks)
+    # detail 404s
+    assert client.get(f"/api/tasks/{t['id']}", headers=admin).status_code == 404
+    # shows in trash
+    trash = client.get("/api/trash", headers=admin).json()
+    assert any(x["id"] == t["id"] and x["deleted_at"] for x in trash)
+    # members cannot delete or view trash
+    assert client.delete(f"/api/tasks/{t['id']}", headers=member).status_code in (403, 404)
+    assert client.get("/api/trash", headers=member).status_code == 403
+
+
+def test_restore_card_from_trash(client, world):
+    admin = auth_header(client, "admin", "pw")
+    t = _assigned_task(client, world)
+    client.delete(f"/api/tasks/{t['id']}", headers=admin)
+
+    r = client.post(f"/api/tasks/{t['id']}/restore", headers=admin)
+    assert r.status_code == 200 and r.json()["deleted_at"] is None
+    tasks = client.get(f"/api/tasks?board_id={world['board'].id}", headers=admin).json()
+    assert any(x["id"] == t["id"] for x in tasks)
+    assert client.get("/api/trash", headers=admin).json() == []
+
+
+def test_purge_card_permanently(client, world):
+    admin = auth_header(client, "admin", "pw")
+    t = _assigned_task(client, world)
+    client.delete(f"/api/tasks/{t['id']}", headers=admin)
+
+    r = client.delete(f"/api/tasks/{t['id']}/purge", headers=admin)
+    assert r.status_code == 200
+    assert client.get("/api/trash", headers=admin).json() == []
+    # restore now impossible
+    assert client.post(f"/api/tasks/{t['id']}/restore", headers=admin).status_code == 404
+
+
+def test_auto_purge_expired_trash(client, world, db):
+    from datetime import datetime, timedelta, timezone
+
+    from app.models import Task
+    from app.services import purge_expired_trash
+
+    admin = auth_header(client, "admin", "pw")
+    t = _assigned_task(client, world)
+    client.delete(f"/api/tasks/{t['id']}", headers=admin)
+
+    # backdate deletion to 31 days ago, then run the purge sweep
+    task = db.get(Task, t["id"])
+    task.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=31)
+    db.commit()
+
+    purged = purge_expired_trash(db)
+    db.commit()
+    assert purged == 1
+    assert client.get("/api/trash", headers=admin).json() == []

@@ -43,8 +43,8 @@ describe('visibleActions — member', () => {
 })
 
 describe('visibleActions — admin', () => {
-  it('sees 审核 only in review column (plus assign on board)', () => {
-    const a = visibleActions({ task: onBoard(1), columnKind: 'review', me: admin })
+  it('sees 审核 only in a requires-review column (plus assign on board)', () => {
+    const a = visibleActions({ task: onBoard(1), columnKind: 'review', requiresReview: true, me: admin })
     expect(a).toContain('review')
     expect(a).toContain('assign_board')
   })
@@ -90,9 +90,14 @@ describe('drag rules', () => {
   it('admin can drag any card', () => {
     expect(canDrag(onBoard(1), admin)).toBe(true)
   })
-  it('nobody can drop into a done column', () => {
-    expect(canDropInto('done')).toBe(false)
-    expect(canDropInto('doing')).toBe(true)
-    expect(canDropInto(null)).toBe(true)
+  it('member cannot drop into done when the board has a review gate', () => {
+    const done = { kind: 'done' as const, requires_review: false }
+    const doing = { kind: 'doing' as const, requires_review: false }
+    expect(canDropInto(done, { role: 'member', boardHasReview: true }).ok).toBe(false)
+    // no review gate → free to complete
+    expect(canDropInto(done, { role: 'member', boardHasReview: false }).ok).toBe(true)
+    expect(canDropInto(doing, { role: 'member', boardHasReview: true }).ok).toBe(true)
+    // admin moves anywhere
+    expect(canDropInto(done, { role: 'admin', boardHasReview: true }).ok).toBe(true)
   })
 })

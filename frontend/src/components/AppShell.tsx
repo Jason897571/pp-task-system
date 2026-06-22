@@ -1,7 +1,7 @@
 import { useRef, useState, type CSSProperties } from 'react'
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Dropdown, Input, Modal, Popconfirm, App as AntApp } from 'antd'
+import { Dropdown, Input, Modal, Popconfirm, Popover, App as AntApp } from 'antd'
 import {
   DndContext,
   PointerSensor,
@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useAuth } from '../auth/AuthContext'
-import { createBoard, deleteBoard, getBoards, reorderBoards } from '../api/endpoints'
+import { createBoard, deleteBoard, getBoards, reorderBoards, updateBoard } from '../api/endpoints'
 import { errMessage } from '../api/client'
 import type { Board } from '../api/types'
 import { avatarColor, initial } from '../lib/badges'
@@ -79,6 +79,12 @@ export function AppShell() {
     onError: (e) => message.error(errMessage(e)),
   })
 
+  const setIconM = useMutation({
+    mutationFn: ({ id, icon }: { id: number; icon: string }) => updateBoard(id, { icon }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['boards'] }),
+    onError: (e) => message.error(errMessage(e)),
+  })
+
   const reorderM = useMutation({
     mutationFn: (ids: number[]) => reorderBoards(ids),
     onError: (e) => {
@@ -115,6 +121,7 @@ export function AppShell() {
   const isAdmin = location.pathname.startsWith('/admin')
   const isRecurring = location.pathname.startsWith('/recurring')
   const isStats = location.pathname.startsWith('/stats')
+  const isTrash = location.pathname.startsWith('/trash')
   const isManager = user?.role === 'admin' || user?.role === 'super_admin'
 
   return (
@@ -122,7 +129,7 @@ export function AppShell() {
       <div className="topbar">
         <span className="logo" onClick={() => navigate('/board')}>
           <span className="dot" />
-          任务系统
+          PP API任务系统
         </span>
         <Input
           className="topbar-search"
@@ -190,6 +197,7 @@ export function AppShell() {
                     active={activeBoardId === b.id}
                     onOpen={() => navigate(`/board/${b.id}`)}
                     onDelete={() => deleteBoardM.mutate(b.id)}
+                    onSetIcon={(icon) => setIconM.mutate({ id: b.id, icon })}
                   />
                 ))}
               </SortableContext>
@@ -201,7 +209,7 @@ export function AppShell() {
                 className={`nav-item ${activeBoardId === b.id ? 'active' : ''}`}
                 onClick={() => navigate(`/board/${b.id}`)}
               >
-                📋 {b.name}
+                {b.icon || '📋'} {b.name}
               </button>
             ))
           )}
@@ -216,6 +224,14 @@ export function AppShell() {
               onClick={() => navigate(`/board/${archiveBoard.id}`)}
             >
               🗄️ {archiveBoard.name}
+            </button>
+          )}
+          {isManager && (
+            <button
+              className={`nav-item ${isTrash ? 'active' : ''}`}
+              onClick={() => navigate('/trash')}
+            >
+              🗑️ 回收箱
             </button>
           )}
 
@@ -282,14 +298,23 @@ export function AppShell() {
   )
 }
 
+// Emoji palette super_admin picks a board icon from.
+const BOARD_ICONS = [
+  '📋', '📁', '📊', '📈', '🎯', '🚀', '💼', '🛠',
+  '🧩', '📌', '🗂', '✅', '🔥', '⭐', '💡', '📦',
+  '🏷', '📝', '🔧', '🎨', '🧪', '🔔', '📅', '💬',
+]
+
 interface SortableBoardItemProps {
   board: Board
   active: boolean
   onOpen: () => void
   onDelete: () => void
+  onSetIcon: (icon: string) => void
 }
 
-function SortableBoardItem({ board, active, onOpen, onDelete }: SortableBoardItemProps) {
+function SortableBoardItem({ board, active, onOpen, onDelete, onSetIcon }: SortableBoardItemProps) {
+  const [iconOpen, setIconOpen] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: board.id })
   const style: CSSProperties = {
@@ -299,15 +324,55 @@ function SortableBoardItem({ board, active, onOpen, onDelete }: SortableBoardIte
     display: 'flex',
     alignItems: 'center',
   }
+  const iconGrid = (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 4, width: 260 }}>
+      {BOARD_ICONS.map((emo) => (
+        <span
+          key={emo}
+          onClick={() => {
+            onSetIcon(emo)
+            setIconOpen(false)
+          }}
+          style={{
+            cursor: 'pointer',
+            fontSize: 18,
+            textAlign: 'center',
+            padding: '4px 0',
+            borderRadius: 6,
+            background: (board.icon || '📋') === emo ? 'rgba(255,255,255,0.12)' : 'transparent',
+          }}
+        >
+          {emo}
+        </span>
+      ))}
+    </div>
+  )
   return (
     <div ref={setNodeRef} style={style} className={`nav-item board-item ${active ? 'active' : ''}`}>
+      <Popover
+        open={iconOpen}
+        onOpenChange={setIconOpen}
+        trigger="click"
+        placement="rightTop"
+        title="选择图标"
+        content={iconGrid}
+      >
+        <span
+          title="点击更换图标"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{ cursor: 'pointer', padding: '0 2px' }}
+        >
+          {board.icon || '📋'}
+        </span>
+      </Popover>
       <span
-        style={{ flex: 1, cursor: 'grab', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}
+        style={{ flex: 1, cursor: 'grab', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', marginLeft: 4 }}
         onClick={onOpen}
         {...attributes}
         {...listeners}
       >
-        📋 {board.name}
+        {board.name}
       </span>
       <Popconfirm
         title="删除看板"

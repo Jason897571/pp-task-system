@@ -1,8 +1,8 @@
 """Shared business helpers: board visibility, column lookups, activity audit."""
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -12,12 +12,18 @@ from app.models import (
     BoardMemberVisibility,
     Checklist,
     ChecklistItem,
+    Deliverable,
     Notification,
     RecurringTask,
     Task,
     TaskActivity,
+    TaskApplication,
+    TaskTag,
     User,
 )
+
+# Cards stay in the recycle bin this long before being purged for good.
+TRASH_RETENTION_DAYS = 30
 
 
 def visible_board_ids(db: Session, user: User) -> set[int] | None:
@@ -82,6 +88,17 @@ def column_of_kind(db: Session, board_id: int, kind: str) -> BoardColumn | None:
     return db.scalars(
         select(BoardColumn)
         .where(BoardColumn.board_id == board_id, BoardColumn.kind == kind)
+        .order_by(BoardColumn.position)
+        .limit(1)
+    ).first()
+
+
+def review_column(db: Session, board_id: int) -> BoardColumn | None:
+    """The board's single review gate (super_admin toggles requires_review).
+    None means this board has no review step."""
+    return db.scalars(
+        select(BoardColumn)
+        .where(BoardColumn.board_id == board_id, BoardColumn.requires_review.is_(True))
         .order_by(BoardColumn.position)
         .limit(1)
     ).first()
@@ -372,9 +389,52 @@ def archive_completed_tasks(db: Session, today: date | None = None) -> int:
         select(Task).where(
             Task.column_id.in_(final_col_ids),
             Task.board_id != archive.id,
+            Task.deleted_at.is_(None),
         )
     ).all()
     for task in tasks:
         task.board_id = archive.id
         task.column_id = target.id
     return len(tasks)
+
+
+def hard_delete_task(db: Session, task: Task) -> None:
+    """Permanently delete one task and all its dependent rows (FK-safe order).
+    Does not commit."""
+    tid = task.id
+    deliverable_ids = list(
+        db.scalars(select(Deliverable.id).where(Deliverable.task_id == tid)).all()
+    )
+    checklist_ids = list(
+        db.scalars(select(Checklist.id).where(Checklist.task_id == tid)).all()
+    )
+    if checklist_ids:
+        db.execute(delete(ChecklistItem).where(ChecklistItem.checklist_id.in_(checklist_ids)))
+    db.execute(delete(Checklist).where(Checklist.task_id == tid))
+    attach_cond = (Attachment.owner_type == "task") & (Attachment.owner_id == tid)
+    if deliverable_ids:
+        attach_cond = attach_cond | (
+            (Attachment.owner_type == "deliverable")
+            & (Attachment.owner_id.in_(deliverable_ids))
+        )
+    db.execute(delete(Attachment).where(attach_cond))
+    db.execute(delete(Deliverable).where(Deliverable.task_id == tid))
+    db.execute(delete(TaskApplication).where(TaskApplication.task_id == tid))
+    db.execute(delete(TaskTag).where(TaskTag.task_id == tid))
+    db.execute(delete(TaskActivity).where(TaskActivity.task_id == tid))
+    db.execute(delete(Notification).where(Notification.related_task_id == tid))
+    db.delete(task)
+
+
+def purge_expired_trash(db: Session, now: datetime | None = None) -> int:
+    """Hard-delete recycle-bin cards whose retention window has elapsed.
+    Returns the number purged. Does not commit."""
+    cutoff = (now or datetime.now(timezone.utc).replace(tzinfo=None)) - timedelta(
+        days=TRASH_RETENTION_DAYS
+    )
+    expired = db.scalars(
+        select(Task).where(Task.deleted_at.is_not(None), Task.deleted_at < cutoff)
+    ).all()
+    for task in expired:
+        hard_delete_task(db, task)
+    return len(expired)
