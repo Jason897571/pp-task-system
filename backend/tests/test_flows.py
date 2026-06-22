@@ -741,3 +741,35 @@ def test_auto_purge_expired_trash(client, world, db):
     db.commit()
     assert purged == 1
     assert client.get("/api/trash", headers=admin).json() == []
+
+
+def test_archive_columns_are_per_board_and_track_rename(client, world):
+    sup = auth_header(client, "super", "pw")
+    admin = auth_header(client, "admin", "pw")
+    member = auth_header(client, "member", "pw")
+
+    # drive a card to the final column, then archive
+    client.put(f"/api/columns/{world['cols']['done'].id}", headers=sup, json={"is_final": True})
+    t = _assigned_task(client, world)
+    client.post(f"/api/tasks/{t['id']}/start", headers=member)
+    client.post(f"/api/tasks/{t['id']}/submit", headers=member, json={"note": "x"})
+    client.post(f"/api/tasks/{t['id']}/review", headers=admin, json={"approve": True})
+    client.post("/api/boards/archive-now", headers=sup)
+
+    boards = client.get("/api/boards", headers=sup).json()
+    archive = next(b for b in boards if b["is_archive"])
+    src = next(b for b in boards if b["id"] == world["board"].id)
+    src_name = src["name"]
+
+    # the archive board has a column named after the source board, holding the card
+    cols = client.get(f"/api/boards/{archive['id']}/columns", headers=sup).json()
+    arch_col = next(c for c in cols if c["name"] == src_name)
+    detail = client.get(f"/api/tasks/{t['id']}", headers=sup).json()
+    assert detail["board_id"] == archive["id"]
+    assert detail["column_id"] == arch_col["id"]
+
+    # renaming the source board renames its archive column in lockstep
+    client.put(f"/api/boards/{world['board'].id}", headers=sup, json={"name": "新看板名"})
+    cols = client.get(f"/api/boards/{archive['id']}/columns", headers=sup).json()
+    assert any(c["name"] == "新看板名" for c in cols)
+    assert all(c["name"] != src_name for c in cols)

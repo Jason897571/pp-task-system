@@ -240,7 +240,17 @@ def list_columns(
         .where(BoardColumn.board_id == board_id)
         .order_by(BoardColumn.position)
     ).all()
-    return [BoardColumnOut.model_validate(c) for c in rows]
+    out = []
+    for c in rows:
+        item = BoardColumnOut.model_validate(c)
+        # Archive columns display their origin board's CURRENT name, so a board
+        # rename is reflected in the archive board immediately.
+        if c.source_board_id is not None:
+            src = db.get(Board, c.source_board_id)
+            if src is not None:
+                item.name = src.name
+        out.append(item)
+    return out
 
 
 @router.post("/boards/{board_id}/columns", response_model=BoardColumnOut)

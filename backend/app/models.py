@@ -82,6 +82,10 @@ class BoardColumn(Base):
     # 提交 lands the card here to await admin approval; if no column requires review
     # the card goes straight to the done column.
     requires_review: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # Only set on archive-board columns: the origin board these archived cards came
+    # from. Plain int (no FK) so the origin board can be deleted independently; the
+    # column's display name is kept in sync with that board's current name.
+    source_board_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     board: Mapped[Board] = relationship(back_populates="columns")
 

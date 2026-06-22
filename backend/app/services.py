@@ -262,7 +262,6 @@ def serialize_task_detail(db: Session, task: Task):
 
 DEFAULT_BOARD_NAME = "任务看板"
 ARCHIVE_BOARD_NAME = "归档看板"
-ARCHIVE_COLUMN_NAME = "已归档"
 
 
 def this_week_friday_1800(today: date) -> datetime:
@@ -356,7 +355,7 @@ def generate_recurring_instances(
 
 
 def get_or_create_archive_board(db: Session) -> Board:
-    """The single global 归档看板. Created on first use with one 已归档 column.
+    """The single global 归档看板. Columns are created per source board on demand.
 
     Visible to everyone (no member-visibility rows). Does not commit."""
     board = db.scalars(select(Board).where(Board.is_archive.is_(True))).first()
@@ -365,19 +364,37 @@ def get_or_create_archive_board(db: Session) -> Board:
         board = Board(name=ARCHIVE_BOARD_NAME, position=max_pos + 1, is_archive=True)
         db.add(board)
         db.flush()
-    if not board.columns:
-        db.add(BoardColumn(board_id=board.id, name=ARCHIVE_COLUMN_NAME, position=0))
-        db.flush()
     return board
 
 
+def get_or_create_archive_column(db: Session, archive: Board, source: Board) -> BoardColumn:
+    """Find (or create) the archive-board column that holds `source`'s archived
+    cards. Its name tracks the source board's current name. Does not commit."""
+    col = db.scalars(
+        select(BoardColumn).where(
+            BoardColumn.board_id == archive.id,
+            BoardColumn.source_board_id == source.id,
+        )
+    ).first()
+    if col is None:
+        col = BoardColumn(
+            board_id=archive.id,
+            name=source.name,
+            position=source.position,
+            source_board_id=source.id,
+        )
+        db.add(col)
+        db.flush()
+    else:
+        col.name = source.name  # keep in sync if the board was renamed
+    return col
+
+
 def archive_completed_tasks(db: Session, today: date | None = None) -> int:
-    """Move every on-board card sitting in an is_final column into the archive
-    board's first column. Returns the number of cards archived. Does not commit."""
+    """Sweep every on-board card sitting in an is_final column into the archive
+    board, each under a column named after its origin board. Returns the number
+    archived. Does not commit."""
     archive = get_or_create_archive_board(db)
-    target = first_column(db, archive.id)
-    if target is None:
-        return 0
 
     final_col_ids = set(
         db.scalars(select(BoardColumn.id).where(BoardColumn.is_final.is_(True))).all()
@@ -392,10 +409,16 @@ def archive_completed_tasks(db: Session, today: date | None = None) -> int:
             Task.deleted_at.is_(None),
         )
     ).all()
+    count = 0
     for task in tasks:
+        source = db.get(Board, task.board_id)
+        if source is None:
+            continue
+        col = get_or_create_archive_column(db, archive, source)
         task.board_id = archive.id
-        task.column_id = target.id
-    return len(tasks)
+        task.column_id = col.id
+        count += 1
+    return count
 
 
 def hard_delete_task(db: Session, task: Task) -> None:
