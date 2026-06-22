@@ -106,10 +106,10 @@ def review_column(db: Session, board_id: int) -> BoardColumn | None:
 
 def log_activity(
     db: Session, task: Task, actor: User, action: str, comment: str | None = None
-) -> None:
-    db.add(
-        TaskActivity(task_id=task.id, actor_id=actor.id, action=action, comment=comment)
-    )
+) -> TaskActivity:
+    act = TaskActivity(task_id=task.id, actor_id=actor.id, action=action, comment=comment)
+    db.add(act)
+    return act
 
 
 def admin_can_touch_task(user: User, task: Task) -> bool:
@@ -269,6 +269,10 @@ def serialize_task_detail(db: Session, task: Task):
                 author=UserOut.model_validate(author),
                 body=a.comment or "",
                 created_at=a.created_at,
+                attachments=[
+                    AttachmentOut.model_validate(att)
+                    for att in attachments_for(db, "comment", a.id)
+                ],
             ).model_dump()
         )
     base["comments"] = comments

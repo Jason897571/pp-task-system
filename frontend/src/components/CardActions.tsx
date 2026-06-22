@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Button, Input, Modal, Select, App as AntApp } from 'antd'
+import { Button, Input, Modal, Select, Upload, App as AntApp } from 'antd'
+import type { UploadFile } from 'antd'
 import type { TaskDetail, User } from '../api/types'
 import { visibleActions } from '../lib/actions'
 import type { ActionKey } from '../lib/actions'
@@ -18,7 +19,7 @@ interface Props {
   onReview: (approve: boolean, comment?: string) => void
   onApprove: (approve: boolean, assigneeId?: number) => void
   onAssign: (assigneeId: number) => void
-  onComment: (text: string) => void
+  onComment: (text: string, files: File[]) => void
 }
 
 const LABELS: Record<ActionKey, string> = {
@@ -40,6 +41,7 @@ export function CardActions(props: Props) {
   const [reviewRejectOpen, setReviewRejectOpen] = useState(false)
   const [reviewComment, setReviewComment] = useState('')
   const [comment, setComment] = useState('')
+  const [commentFiles, setCommentFiles] = useState<UploadFile[]>([])
   const [assignTarget, setAssignTarget] = useState<number | undefined>()
 
   if (actions.length === 0) {
@@ -84,18 +86,28 @@ export function CardActions(props: Props) {
           <Input.TextArea
             data-action="comment-input"
             rows={2}
-            placeholder="给负责人留个评论（会发送到 ta 的通知）…"
+            placeholder="给负责人留个评论（会发送到 ta 的通知，可附文件）…"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
           />
+          <Upload
+            fileList={commentFiles}
+            beforeUpload={() => false}
+            onChange={({ fileList }) => setCommentFiles(fileList)}
+            multiple
+          >
+            <Button size="small">📎 添加附件</Button>
+          </Upload>
           <Button
             data-action="comment-send"
             block
             loading={busy}
             disabled={!comment.trim()}
             onClick={() => {
-              props.onComment(comment.trim())
+              const files = commentFiles.map((f) => f.originFileObj as File).filter(Boolean)
+              props.onComment(comment.trim(), files)
               setComment('')
+              setCommentFiles([])
             }}
           >
             💬 发送评论

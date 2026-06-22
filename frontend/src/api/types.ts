@@ -137,6 +137,7 @@ export interface Comment {
   author: User
   body: string
   created_at: string
+  attachments: Attachment[]
 }
 
 export interface ChecklistItem {

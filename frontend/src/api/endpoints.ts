@@ -23,6 +23,7 @@ import type {
   Checklist,
   ChecklistItem,
   Attachment,
+  Comment,
   RecurringTask,
   CreateRecurringBody,
   UpdateRecurringBody,
@@ -123,7 +124,7 @@ export const reviewTask = (id: number, body: { approve: boolean; comment?: strin
   api.post<Task>(`/tasks/${id}/review`, body).then((r) => r.data)
 
 export const commentTask = (id: number, comment: string) =>
-  api.post<Task>(`/tasks/${id}/comment`, { comment }).then((r) => r.data)
+  api.post<Comment>(`/tasks/${id}/comment`, { comment }).then((r) => r.data)
 
 export const assignTask = (id: number, assignee_id: number) =>
   api.post<Task>(`/tasks/${id}/assign`, { assignee_id }).then((r) => r.data)
@@ -192,7 +193,7 @@ export const deleteChecklistItem = (iid: number) =>
 // --- Files ---
 export const uploadFile = (
   file: File,
-  ownerType: 'task' | 'deliverable',
+  ownerType: 'task' | 'deliverable' | 'comment',
   ownerId: number,
 ) => {
   const fd = new FormData()

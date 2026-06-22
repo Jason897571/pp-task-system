@@ -784,14 +784,26 @@ def test_admin_comment_notifies_assignee(client, world):
         f"/api/tasks/{t['id']}/comment", headers=admin, json={"comment": "请补充测试用例"}
     )
     assert r.status_code == 200
+    cid = r.json()["id"]
 
     notifs = client.get("/api/notifications", headers=member).json()
     assert any(n["type"] == "comment" and "请补充测试用例" in n["message"] for n in notifs)
 
-    # the comment is also shown on the card (under 产出), visible to the assignee
+    # admin can attach a file to the comment
+    up = client.post(
+        "/api/files/upload",
+        headers=admin,
+        files={"file": ("note.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+        data={"owner_type": "comment", "owner_id": str(cid)},
+    )
+    assert up.status_code == 200
+
+    # the comment + its attachment show on the card, visible to the assignee
     detail = client.get(f"/api/tasks/{t['id']}", headers=member).json()
     assert any(c["body"] == "请补充测试用例" for c in detail["comments"])
     assert detail["comments"][0]["author"]["full_name"]
+    c = next(c for c in detail["comments"] if c["id"] == cid)
+    assert len(c["attachments"]) == 1 and c["attachments"][0]["filename"] == "note.png"
 
     # empty comment rejected; members cannot comment
     assert client.post(

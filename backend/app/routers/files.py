@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import Attachment, Deliverable, Task, User
+from app.models import Attachment, Deliverable, Task, TaskActivity, User
 from app.schemas import AttachmentOut
 from app.services import admin_can_touch_task, board_can_see, can_edit_task
 from sqlalchemy.orm import Session
@@ -42,6 +42,9 @@ def _task_for_owner(db: Session, owner_type: str, owner_id: int) -> Task | None:
     if owner_type == "deliverable":
         d = db.get(Deliverable, owner_id)
         return db.get(Task, d.task_id) if d else None
+    if owner_type == "comment":
+        a = db.get(TaskActivity, owner_id)
+        return db.get(Task, a.task_id) if a else None
     return None
 
 
@@ -70,7 +73,7 @@ def upload_file(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if owner_type not in ("task", "deliverable"):
+    if owner_type not in ("task", "deliverable", "comment"):
         raise HTTPException(status_code=400, detail="无效的 owner_type")
 
     task = _task_for_owner(db, owner_type, owner_id)

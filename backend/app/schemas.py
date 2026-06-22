@@ -131,6 +131,7 @@ class CommentOut(BaseModel):
     author: UserOut
     body: str
     created_at: datetime
+    attachments: list[AttachmentOut] = []
 
 
 class ChecklistItemOut(BaseModel):

@@ -96,7 +96,12 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
     mutationFn: (b: { approve: boolean; assignee_id?: number }) => approveTask(taskId, b),
   })
   const assignM = useMutation({ mutationFn: (id: number) => assignTask(taskId, id) })
-  const commentM = useMutation({ mutationFn: (text: string) => commentTask(taskId, text) })
+  const commentM = useMutation({
+    mutationFn: async ({ text, files }: { text: string; files: File[] }) => {
+      const c = await commentTask(taskId, text)
+      for (const f of files) await uploadFile(f, 'comment', c.id)
+    },
+  })
   const updateM = useMutation({
     mutationFn: (body: { description?: string; due_date?: string | null; priority?: string }) =>
       updateTask(taskId, body),
@@ -238,7 +243,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
         )
       }
       onAssign={(id) => wrap(() => assignM.mutateAsync(id), '已指派')}
-      onComment={(text) => wrap(() => commentM.mutateAsync(text), '评论已发送')}
+      onComment={(text, files) => wrap(() => commentM.mutateAsync({ text, files }), '评论已发送')}
     />
   )
 
@@ -491,6 +496,12 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                           <span className="tm">{dueLabel(c.created_at)}</span>
                         </div>
                         <div className="cm-comment-text">{c.body}</div>
+                        <AttachmentList
+                          attachments={c.attachments}
+                          pill
+                          deletable={isManager}
+                          onDeleted={invalidate}
+                        />
                       </div>
                     </div>
                   ))}

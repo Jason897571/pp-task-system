@@ -17,6 +17,7 @@ from app.schemas import (
     ApproveIn,
     AssignIn,
     CommentIn,
+    CommentOut,
     MoveBoardIn,
     MoveIn,
     ReviewIn,
@@ -25,6 +26,7 @@ from app.schemas import (
     TaskIn,
     TaskOut,
     TaskUpdateIn,
+    UserOut,
 )
 from app.services import (
     admin_can_touch_task,
@@ -442,14 +444,15 @@ def review_task(
     return serialize_task(db, task)
 
 
-@router.post("/tasks/{task_id}/comment", response_model=TaskOut)
+@router.post("/tasks/{task_id}/comment", response_model=CommentOut)
 def comment_task(
     task_id: int,
     body: CommentIn,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """Admin/super leaves a comment on a card; the assignee is notified."""
+    """Admin/super leaves a comment on a card; the assignee is notified. Returns the
+    new comment (with its id) so the client can attach files to it."""
     task = db.get(Task, task_id)
     if task is None or task.deleted_at is not None:
         raise HTTPException(status_code=404, detail="任务不存在")
@@ -458,12 +461,18 @@ def comment_task(
     text = body.comment.strip()
     if not text:
         raise HTTPException(status_code=400, detail="评论不能为空")
-    log_activity(db, task, user, "commented", comment=text)
+    act = log_activity(db, task, user, "commented", comment=text)
     if task.assignee_id is not None and task.assignee_id != user.id:
         notify(db, task.assignee_id, "comment", f"任务「{task.title}」收到评论：{text}", task.id)
     db.commit()
-    db.refresh(task)
-    return serialize_task(db, task)
+    db.refresh(act)
+    return CommentOut(
+        id=act.id,
+        author=UserOut.model_validate(user),
+        body=text,
+        created_at=act.created_at,
+        attachments=[],
+    )
 
 
 # ---- recycle bin (admin/super only) ----
