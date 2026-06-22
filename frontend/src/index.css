@@ -364,6 +364,34 @@ body {
 .card-restore:hover {
   background: #14402c;
 }
+/* Copy-card affordance, top-right; appears on card hover. */
+.card-copy {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #ffffff1f;
+  background: #0e1424cc;
+  color: #aab2c8;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.card:hover .card-copy {
+  opacity: 0.85;
+}
+.card-copy:hover {
+  opacity: 1;
+  color: #fff;
+  border-color: #7c5cffaa;
+}
 .av-sm {
   width: 24px;
   height: 24px;

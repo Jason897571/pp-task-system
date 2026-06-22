@@ -32,6 +32,7 @@ from app.services import (
     admin_can_touch_task,
     board_can_see,
     column_of_kind,
+    copy_requirement_children,
     hard_delete_task,
     log_activity,
     notify,
@@ -473,6 +474,51 @@ def comment_task(
         created_at=act.created_at,
         attachments=[],
     )
+
+
+@router.post("/tasks/{task_id}/duplicate", response_model=TaskOut)
+def duplicate_task(
+    task_id: int,
+    body: AssignIn,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Copy a card's requirement (title/desc/priority/deadline/attachments/checklists/
+    tags) into a new on-board card assigned to body.assignee_id. The 产出 side
+    (deliverables/comments/applications) is not copied."""
+    src = db.get(Task, task_id)
+    if src is None or src.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not admin_can_touch_task(user, src):
+        raise HTTPException(status_code=403, detail="无权复制该任务")
+    assignee = db.get(User, body.assignee_id)
+    if assignee is None:
+        raise HTTPException(status_code=404, detail="接收人不存在")
+    col = start_column(db, src.board_id)
+    if col is None:
+        raise HTTPException(status_code=409, detail="看板没有可用的起始列")
+
+    dst = Task(
+        title=src.title,
+        description=src.description,
+        creator_id=user.id,
+        assignee_id=assignee.id,
+        department_id=src.department_id,
+        board_id=src.board_id,
+        column_id=col.id,
+        lifecycle="on_board",
+        priority=src.priority,
+        is_mandatory=src.is_mandatory,
+        due_date=src.due_date,
+    )
+    db.add(dst)
+    db.flush()
+    copy_requirement_children(db, src, dst)
+    log_activity(db, dst, user, "assigned")
+    notify(db, assignee.id, "assigned", f"你被指派了任务「{dst.title}」", dst.id)
+    db.commit()
+    db.refresh(dst)
+    return serialize_task(db, dst)
 
 
 # ---- recycle bin (admin/super only) ----

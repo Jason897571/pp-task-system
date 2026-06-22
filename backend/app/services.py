@@ -1,6 +1,9 @@
 """Shared business helpers: board visibility, column lookups, activity audit."""
 
+import shutil
+import uuid
 from datetime import date, datetime, time, timedelta, timezone
+from pathlib import Path
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -200,6 +203,49 @@ def attachments_for(db: Session, owner_type: str, owner_id: int) -> list[Attachm
             .order_by(Attachment.id)
         ).all()
     )
+
+
+def copy_requirement_children(db: Session, src: Task, dst: Task) -> None:
+    """Copy a task's requirement-side children onto dst: checklists (+items, with
+    done state reset), tags, and requirement attachments (files duplicated on disk).
+    Deliverables / comments / applications are intentionally NOT copied. No commit."""
+    for cl in src.checklists:
+        new_cl = Checklist(task_id=dst.id, title=cl.title, position=cl.position)
+        db.add(new_cl)
+        db.flush()
+        for it in cl.items:
+            db.add(
+                ChecklistItem(
+                    checklist_id=new_cl.id,
+                    content=it.content,
+                    position=it.position,
+                    is_done=False,
+                )
+            )
+
+    for tag in src.tags:
+        db.add(TaskTag(task_id=dst.id, tag_id=tag.id))
+
+    for att in attachments_for(db, "task", src.id):
+        path = Path(att.filepath)
+        if not path.exists():
+            continue
+        dest = path.parent / f"{uuid.uuid4().hex}-{att.filename}"
+        try:
+            shutil.copyfile(path, dest)
+        except OSError:
+            continue
+        db.add(
+            Attachment(
+                owner_type="task",
+                owner_id=dst.id,
+                uploader_id=att.uploader_id,
+                filename=att.filename,
+                filepath=str(dest),
+                filesize=att.filesize,
+                content_type=att.content_type,
+            )
+        )
 
 
 # ---------------------------------------------------------------------------

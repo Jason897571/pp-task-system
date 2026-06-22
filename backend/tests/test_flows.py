@@ -812,3 +812,63 @@ def test_admin_comment_notifies_assignee(client, world):
     assert client.post(
         f"/api/tasks/{t['id']}/comment", headers=member, json={"comment": "x"}
     ).status_code in (401, 403)
+
+
+def test_duplicate_task_copies_requirement_only(client, world):
+    admin = auth_header(client, "admin", "pw")
+    member = auth_header(client, "member", "pw")
+    src = client.post(
+        "/api/tasks",
+        headers=admin,
+        json={
+            "title": "原始需求",
+            "board_id": world["board"].id,
+            "assignee_id": world["member"].id,
+            "priority": "high",
+            "description": "做这个",
+        },
+    ).json()
+    cl = client.post(
+        f"/api/tasks/{src['id']}/checklists", headers=admin, json={"title": "步骤"}
+    ).json()
+    client.post(f"/api/checklists/{cl['id']}/items", headers=admin, json={"content": "第一步"})
+    client.post(
+        "/api/files/upload",
+        headers=admin,
+        files={"file": ("req.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+        data={"owner_type": "task", "owner_id": str(src["id"])},
+    )
+    # a deliverable (产出) that must NOT be copied
+    client.post(f"/api/tasks/{src['id']}/start", headers=member)
+    client.post(f"/api/tasks/{src['id']}/submit", headers=member, json={"note": "做完了"})
+
+    dup = client.post(
+        f"/api/tasks/{src['id']}/duplicate",
+        headers=admin,
+        json={"assignee_id": world["member2"].id},
+    )
+    assert dup.status_code == 200
+    new_id = dup.json()["id"]
+    assert new_id != src["id"]
+    assert dup.json()["assignee"]["id"] == world["member2"].id
+    assert dup.json()["lifecycle"] == "on_board"
+    assert dup.json()["priority"] == "high"
+
+    detail = client.get(f"/api/tasks/{new_id}", headers=admin).json()
+    assert detail["description"] == "做这个"
+    assert len(detail["checklists"]) == 1
+    assert detail["checklists"][0]["items"][0]["content"] == "第一步"
+    assert detail["checklists"][0]["items"][0]["is_done"] is False
+    assert len(detail["attachments"]) == 1 and detail["attachments"][0]["filename"] == "req.png"
+    # 产出 side not copied
+    assert detail["deliverables"] == []
+    assert detail["comments"] == []
+    # new card sits in the board's start column
+    cols = client.get(f"/api/boards/{world['board'].id}/columns", headers=admin).json()
+    start_col = next(c for c in cols if c["kind"] == "start")
+    assert detail["column_id"] == start_col["id"]
+
+    # members cannot duplicate (assigning to others is a manager action)
+    assert client.post(
+        f"/api/tasks/{src['id']}/duplicate", headers=member, json={"assignee_id": world["member"].id}
+    ).status_code in (401, 403)

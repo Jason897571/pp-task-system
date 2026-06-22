@@ -126,6 +126,9 @@ export const reviewTask = (id: number, body: { approve: boolean; comment?: strin
 export const commentTask = (id: number, comment: string) =>
   api.post<Comment>(`/tasks/${id}/comment`, { comment }).then((r) => r.data)
 
+export const duplicateTask = (id: number, assignee_id: number) =>
+  api.post<Task>(`/tasks/${id}/duplicate`, { assignee_id }).then((r) => r.data)
+
 export const assignTask = (id: number, assignee_id: number) =>
   api.post<Task>(`/tasks/${id}/assign`, { assignee_id }).then((r) => r.data)
 

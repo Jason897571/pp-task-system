@@ -24,6 +24,7 @@ import { errMessage } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { BoardColumnView } from '../components/BoardColumn'
 import { RestoreModal } from '../components/RestoreModal'
+import { DuplicateModal } from '../components/DuplicateModal'
 import { PRIORITY_RANK } from '../lib/badges'
 import { CardDetailModal } from '../components/CardDetailModal'
 import { canDropInto } from '../lib/actions'
@@ -53,6 +54,7 @@ export function BoardPage() {
   const isManager = user?.role === 'admin' || isSuperAdmin
   const isArchive = !!board?.is_archive
   const [restoreTask, setRestoreTask] = useState<Task | null>(null)
+  const [copyTask, setCopyTask] = useState<Task | null>(null)
 
   const { data: columns = [], isLoading: colsLoading } = useQuery({
     queryKey: ['columns', boardId],
@@ -234,6 +236,7 @@ export function BoardPage() {
                 onSetFinal={(colId, isFinal) => setFinalM.mutate({ colId, isFinal })}
                 onSetReview={(colId, requiresReview) => setReviewM.mutate({ colId, requiresReview })}
                 onRestore={isArchive && isManager ? setRestoreTask : undefined}
+                onCopy={isManager && !isArchive ? setCopyTask : undefined}
               />
             ))}
             {isSuperAdmin && (
@@ -261,6 +264,8 @@ export function BoardPage() {
       {restoreTask && (
         <RestoreModal task={restoreTask} boards={boards} onClose={() => setRestoreTask(null)} />
       )}
+
+      {copyTask && <DuplicateModal task={copyTask} onClose={() => setCopyTask(null)} />}
     </>
   )
 }

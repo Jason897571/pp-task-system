@@ -11,12 +11,14 @@ function DraggableCard({
   me,
   onOpen,
   onRestore,
+  onCopy,
 }: {
   task: Task
   col: Col
   me: Pick<User, 'id' | 'role'>
   onOpen: (id: number) => void
   onRestore?: (task: Task) => void
+  onCopy?: (task: Task) => void
 }) {
   const draggable = canDrag(task, me)
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -33,6 +35,20 @@ function DraggableCard({
       onClick={() => onOpen(task.id)}
       {...(draggable ? { ...listeners, ...attributes } : {})}
     >
+      {onCopy && (
+        <button
+          type="button"
+          className="card-copy"
+          title="复制卡片并指派给他人（仅复制需求，不含产出）"
+          onClick={(e) => {
+            e.stopPropagation()
+            onCopy(task)
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          ⧉
+        </button>
+      )}
       <CardFront task={task} columnKind={col.kind} isFinal={col.is_final} />
       {onRestore && (
         <button
@@ -62,6 +78,7 @@ interface Props {
   onSetFinal: (colId: number, isFinal: boolean) => void
   onSetReview: (colId: number, requiresReview: boolean) => void
   onRestore?: (task: Task) => void
+  onCopy?: (task: Task) => void
 }
 
 export function BoardColumnView({
@@ -76,6 +93,7 @@ export function BoardColumnView({
   onSetFinal,
   onSetReview,
   onRestore,
+  onCopy,
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id, data: { col } })
   const [adding, setAdding] = useState(false)
@@ -172,6 +190,7 @@ export function BoardColumnView({
             me={me}
             onOpen={onOpenCard}
             onRestore={onRestore}
+            onCopy={onCopy}
           />
         ))}
       </div>
