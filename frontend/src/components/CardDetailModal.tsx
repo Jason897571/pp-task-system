@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ClipboardEvent } from 'react'
 import { Button, DatePicker, Input, Modal, Popconfirm, Select, Spin, Upload, App as AntApp } from 'antd'
 import type { UploadFile } from 'antd'
 import dayjs from 'dayjs'
@@ -173,6 +173,45 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
     })
   }
 
+  // Paste an image into 需求描述 → upload it straight to the requirement attachments.
+  const onDescPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const imgs = imagesFromClipboard(e)
+    if (imgs.length === 0) return
+    e.preventDefault()
+    void (async () => {
+      let ok = 0
+      for (const f of imgs) {
+        try {
+          await uploadFile(f, 'task', taskId)
+          ok += 1
+        } catch (err) {
+          message.error(errMessage(err, '图片上传失败'))
+        }
+      }
+      if (ok > 0) {
+        message.success(`已添加 ${ok} 张图片到需求附件`)
+        invalidate()
+      }
+    })()
+  }
+
+  // Paste an image into 提交产出 → stage it; it uploads with the deliverable on submit.
+  const onOutPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const imgs = imagesFromClipboard(e)
+    if (imgs.length === 0) return
+    e.preventDefault()
+    setOutFiles((prev) => [
+      ...prev,
+      ...imgs.map((f) => ({
+        uid: f.name,
+        name: f.name,
+        status: 'done' as const,
+        originFileObj: f as never,
+      })),
+    ])
+    message.success(`已粘贴 ${imgs.length} 张图片，提交时一并上传`)
+  }
+
   const due = task ? dueState(task.due_date, columnKind) : null
   const status = task ? deliverStatus(columnKind, task.is_rework, requiresReview) : null
 
@@ -262,7 +301,8 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                     autoSize={{ minRows: 3, maxRows: 12 }}
                     value={descDraft}
                     onChange={(e) => setDescDraft(e.target.value)}
-                    placeholder="输入需求描述…"
+                    onPaste={onDescPaste}
+                    placeholder="输入需求描述…（可直接粘贴图片）"
                   />
                   <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
                     <Button
@@ -437,7 +477,8 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                   autoSize={{ minRows: 2, maxRows: 8 }}
                   value={outNote}
                   onChange={(e) => setOutNote(e.target.value)}
-                  placeholder="填写产出说明 / 链接…"
+                  onPaste={onOutPaste}
+                  placeholder="填写产出说明 / 链接…（可直接粘贴图片）"
                 />
                 <div className="cm-composer-row">
                   <Upload
@@ -483,6 +524,25 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
       )}
     </Modal>
   )
+}
+
+// Pull image files out of a clipboard paste (screenshots / copied images), giving
+// each a unique readable name (clipboard images all arrive as "image.png").
+let _pasteSeq = 0
+function imagesFromClipboard(e: ClipboardEvent): File[] {
+  const items = e.clipboardData?.items
+  if (!items) return []
+  const out: File[] = []
+  for (const it of Array.from(items)) {
+    if (it.kind === 'file' && it.type.startsWith('image/')) {
+      const f = it.getAsFile()
+      if (!f) continue
+      _pasteSeq += 1
+      const ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')
+      out.push(new File([f], `粘贴图片-${_pasteSeq}.${ext}`, { type: f.type }))
+    }
+  }
+  return out
 }
 
 // Current output status derived from the column kind + rework flag (truthful, no
