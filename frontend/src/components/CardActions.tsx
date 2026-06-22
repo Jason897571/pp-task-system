@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { Button, Input, Modal, Select, Upload, App as AntApp } from 'antd'
+import { Button, Input, Modal, Popconfirm, Select, Upload, App as AntApp } from 'antd'
 import type { UploadFile } from 'antd'
 import type { TaskDetail, User } from '../api/types'
 import { visibleActions } from '../lib/actions'
-import type { ActionKey } from '../lib/actions'
 
 interface Props {
   task: TaskDetail
@@ -20,152 +19,221 @@ interface Props {
   onApprove: (approve: boolean, assigneeId?: number) => void
   onAssign: (assigneeId: number) => void
   onComment: (text: string, files: File[]) => void
+  onDelete?: () => void
 }
 
-const LABELS: Record<ActionKey, string> = {
-  start: '▶ 开始',
-  submit: '⬆ 提交产出',
-  apply: '🙋 申请',
-  review: '审核',
-  approve: '审批',
-  assign_pool: '分派',
-  assign_board: '指派 / 转派',
-}
+type Pane = null | 'comment' | 'assign' | 'approve'
 
-// Renders the role+column-gated action buttons (spec §9). data-action attrs aid testing.
+// Role+column-gated actions. Members get a single primary button; managers get a
+// compact toolbar (✓通过 ↩打回 ┃ 💬评论 👤指派 🗑) with click-to-expand panes.
 export function CardActions(props: Props) {
-  const { task, columnKind, requiresReview, me, busy } = props
+  const { task, columnKind, requiresReview, me, busy, onDelete } = props
   const { message } = AntApp.useApp()
   const actions = visibleActions({ task, columnKind, requiresReview, me })
+  const assignablePool = props.assignableUsers ?? []
 
+  const hasReview = actions.includes('review')
+  const hasApprove = actions.includes('approve')
+  const hasAssign = actions.includes('assign_pool') || actions.includes('assign_board')
+  const hasToolbar = hasReview || hasApprove || hasAssign || !!onDelete
+
+  // The sole action of a context opens expanded; review's primary keys stay inline.
+  const initialPane: Pane = hasApprove ? 'approve' : hasAssign && !hasReview ? 'assign' : null
+
+  const [pane, setPane] = useState<Pane>(initialPane)
   const [reviewRejectOpen, setReviewRejectOpen] = useState(false)
   const [reviewComment, setReviewComment] = useState('')
   const [comment, setComment] = useState('')
   const [commentFiles, setCommentFiles] = useState<UploadFile[]>([])
   const [assignTarget, setAssignTarget] = useState<number | undefined>()
 
-  if (actions.length === 0) {
-    return <div style={{ color: 'var(--subtle)', fontSize: 13 }}>无可用动作</div>
+  const toggle = (p: Exclude<Pane, null>) => setPane(pane === p ? null : p)
+
+  // ---- members / no-toolbar contexts: single primary button ----
+  if (!hasToolbar) {
+    return (
+      <div className="modal-action-grp">
+        {actions.includes('start') && (
+          <Button data-action="start" type="primary" block loading={busy} onClick={props.onStart}>
+            ▶ 开始
+          </Button>
+        )}
+        {actions.includes('apply') && (
+          <Button data-action="apply" type="primary" block loading={busy} onClick={props.onApply}>
+            🙋 申请
+          </Button>
+        )}
+        {actions.length === 0 && (
+          <div style={{ color: 'var(--subtle)', fontSize: 13 }}>无可用动作</div>
+        )}
+      </div>
+    )
   }
 
-  const assignablePool = props.assignableUsers ?? []
+  const sendComment = () => {
+    const files = commentFiles.map((f) => f.originFileObj as File).filter(Boolean)
+    props.onComment(comment.trim(), files)
+    setComment('')
+    setCommentFiles([])
+  }
 
   return (
-    <div className="modal-action-grp">
-      {actions.includes('start') && (
-        <Button data-action="start" type="primary" block loading={busy} onClick={props.onStart}>
-          {LABELS.start}
-        </Button>
-      )}
+    <div className="cm-actionbar">
+      <div className="cm-toolbar">
+        {hasReview && (
+          <>
+            <button
+              data-action="review-approve"
+              className="tbtn primary"
+              disabled={busy}
+              onClick={() => props.onReview(true)}
+            >
+              ✓ 通过
+            </button>
+            <button
+              data-action="review-reject"
+              className="tbtn danger"
+              onClick={() => setReviewRejectOpen(true)}
+            >
+              ↩ 打回
+            </button>
+            <span className="tdiv" />
+            <button
+              className={`tbtn ${pane === 'comment' ? 'active' : ''}`}
+              onClick={() => toggle('comment')}
+            >
+              💬 评论
+            </button>
+          </>
+        )}
 
-      {actions.includes('apply') && (
-        <Button data-action="apply" type="primary" block loading={busy} onClick={props.onApply}>
-          {LABELS.apply}
-        </Button>
-      )}
+        {hasApprove && (
+          <button
+            className={`tbtn ${pane === 'approve' ? 'active' : ''}`}
+            onClick={() => toggle('approve')}
+          >
+            ✓ 审批
+          </button>
+        )}
 
-      {actions.includes('review') && (
-        <>
-          <Button
-            data-action="review-approve"
-            type="primary"
-            block
-            loading={busy}
-            onClick={() => props.onReview(true)}
+        {hasAssign && (
+          <button
+            className={`tbtn ${pane === 'assign' ? 'active' : ''}`}
+            onClick={() => toggle('assign')}
           >
-            ✓ 审核通过
-          </Button>
-          <Button
-            data-action="review-reject"
-            danger
-            block
-            onClick={() => setReviewRejectOpen(true)}
-          >
-            ↩ 打回重做
-          </Button>
+            👤 {actions.includes('assign_pool') ? '分派' : '指派 / 转派'}
+          </button>
+        )}
+
+        {onDelete && (
+          <>
+            <span className="tspacer" />
+            <Popconfirm
+              title="删除卡片？"
+              description="卡片将移入回收箱，保留 30 天，可随时恢复。"
+              okText="删除"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+              onConfirm={onDelete}
+            >
+              <button className="tbtn icon danger" title="删除卡片">
+                🗑
+              </button>
+            </Popconfirm>
+          </>
+        )}
+      </div>
+
+      {pane === 'comment' && (
+        <div className="cm-pane">
           <Input.TextArea
             data-action="comment-input"
-            rows={2}
+            autoSize={{ minRows: 2, maxRows: 6 }}
             placeholder="给负责人留个评论（会发送到 ta 的通知，可附文件）…"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
           />
-          <Upload
-            fileList={commentFiles}
-            beforeUpload={() => false}
-            onChange={({ fileList }) => setCommentFiles(fileList)}
-            multiple
-          >
-            <Button size="small">📎 添加附件</Button>
-          </Upload>
-          <Button
-            data-action="comment-send"
-            block
-            loading={busy}
-            disabled={!comment.trim()}
-            onClick={() => {
-              const files = commentFiles.map((f) => f.originFileObj as File).filter(Boolean)
-              props.onComment(comment.trim(), files)
-              setComment('')
-              setCommentFiles([])
-            }}
-          >
-            💬 发送评论
-          </Button>
-        </>
+          <div className="cm-pane-foot">
+            <Upload
+              fileList={commentFiles}
+              beforeUpload={() => false}
+              onChange={({ fileList }) => setCommentFiles(fileList)}
+              multiple
+            >
+              <Button size="small">📎 附件</Button>
+            </Upload>
+            <Button
+              data-action="comment-send"
+              type="primary"
+              size="small"
+              loading={busy}
+              disabled={!comment.trim()}
+              onClick={sendComment}
+            >
+              💬 发送评论
+            </Button>
+          </div>
+        </div>
       )}
 
-      {actions.includes('approve') && (
-        <>
+      {pane === 'assign' && (
+        <div className="cm-pane">
+          <div className="cm-pane-row">
+            <Select
+              data-action="assign-target"
+              placeholder={actions.includes('assign_pool') ? '分派给…' : '指派 / 转派给…'}
+              style={{ flex: 1 }}
+              showSearch
+              optionFilterProp="label"
+              options={assignablePool.map((u) => ({ value: u.id, label: u.full_name }))}
+              value={assignTarget}
+              onChange={setAssignTarget}
+            />
+            <Button
+              data-action="assign-confirm"
+              type="primary"
+              loading={busy}
+              onClick={() => {
+                if (!assignTarget) return message.warning('请选择人员')
+                props.onAssign(assignTarget)
+              }}
+            >
+              {actions.includes('assign_pool') ? '分派' : '指派'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {pane === 'approve' && (
+        <div className="cm-pane">
           <Select
             data-action="approve-assignee"
             placeholder="通过后指派给…"
             style={{ width: '100%' }}
+            showSearch
+            optionFilterProp="label"
             options={assignablePool.map((u) => ({ value: u.id, label: u.full_name }))}
             value={assignTarget}
             onChange={setAssignTarget}
           />
-          <Button
-            data-action="approve-accept"
-            type="primary"
-            block
-            loading={busy}
-            onClick={() => {
-              if (!assignTarget) return message.warning('请选择指派人')
-              props.onApprove(true, assignTarget)
-            }}
-          >
-            ✓ 通过 + 指派
-          </Button>
-          <Button data-action="approve-reject" danger block onClick={() => props.onApprove(false)}>
-            ✕ 拒绝
-          </Button>
-        </>
-      )}
-
-      {(actions.includes('assign_pool') || actions.includes('assign_board')) && (
-        <>
-          <Select
-            data-action="assign-target"
-            placeholder={actions.includes('assign_pool') ? '分派给…' : '指派 / 转派给…'}
-            style={{ width: '100%' }}
-            options={assignablePool.map((u) => ({ value: u.id, label: u.full_name }))}
-            value={assignTarget}
-            onChange={setAssignTarget}
-          />
-          <Button
-            data-action="assign-confirm"
-            type="primary"
-            block
-            loading={busy}
-            onClick={() => {
-              if (!assignTarget) return message.warning('请选择人员')
-              props.onAssign(assignTarget)
-            }}
-          >
-            {actions.includes('assign_pool') ? LABELS.assign_pool : LABELS.assign_board}
-          </Button>
-        </>
+          <div className="cm-pane-row" style={{ marginTop: 8 }}>
+            <Button
+              data-action="approve-accept"
+              type="primary"
+              style={{ flex: 1 }}
+              loading={busy}
+              onClick={() => {
+                if (!assignTarget) return message.warning('请选择指派人')
+                props.onApprove(true, assignTarget)
+              }}
+            >
+              ✓ 通过 + 指派
+            </Button>
+            <Button data-action="approve-reject" danger onClick={() => props.onApprove(false)}>
+              ✕ 拒绝
+            </Button>
+          </div>
+        </div>
       )}
 
       <Modal

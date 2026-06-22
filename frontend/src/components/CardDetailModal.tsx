@@ -1,5 +1,5 @@
 import { useState, type ClipboardEvent } from 'react'
-import { Button, DatePicker, Input, Modal, Popconfirm, Select, Spin, Upload, App as AntApp } from 'antd'
+import { Button, DatePicker, Input, Modal, Select, Spin, Upload, App as AntApp } from 'antd'
 import type { UploadFile } from 'antd'
 import dayjs from 'dayjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -244,6 +244,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
       }
       onAssign={(id) => wrap(() => assignM.mutateAsync(id), '已指派')}
       onComment={(text, files) => wrap(() => commentM.mutateAsync({ text, files }), '评论已发送')}
+      onDelete={isManager ? () => deleteM.mutate() : undefined}
     />
   )
 
@@ -543,23 +544,6 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
             )}
 
             {cardActions && <div className="cm-actions">{cardActions}</div>}
-
-            {isManager && (
-              <div className="cm-actions" style={{ marginTop: 8 }}>
-                <Popconfirm
-                  title="删除卡片？"
-                  description="卡片将移入回收箱，保留 30 天，可随时恢复。"
-                  okText="删除"
-                  cancelText="取消"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => deleteM.mutate()}
-                >
-                  <Button danger block loading={deleteM.isPending}>
-                    🗑 删除卡片
-                  </Button>
-                </Popconfirm>
-              </div>
-            )}
           </div>
         </div>
       )}

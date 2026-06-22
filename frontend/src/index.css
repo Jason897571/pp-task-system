@@ -448,6 +448,96 @@ body {
   gap: 8px;
 }
 
+/* Compact action toolbar (方案 B): one row of chips + click-to-expand panes. */
+.cm-actionbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #0a0d17;
+  border: 1px solid #ffffff14;
+  border-radius: 10px;
+  padding: 7px;
+  flex-wrap: wrap;
+}
+.cm-toolbar .tbtn {
+  background: #141a2b;
+  border: 1px solid #ffffff1f;
+  color: #b8c1d4;
+  border-radius: 7px;
+  padding: 7px 11px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.cm-toolbar .tbtn:hover {
+  color: #fff;
+  border-color: #7c5cff88;
+}
+.cm-toolbar .tbtn.primary {
+  background: linear-gradient(135deg, #7c5cff, #22d3ee);
+  border: none;
+  color: #fff;
+}
+.cm-toolbar .tbtn.primary:hover {
+  background: linear-gradient(135deg, #8d70ff, #3bdcf0);
+}
+.cm-toolbar .tbtn.danger {
+  color: #ff7875;
+  border-color: #ff787566;
+}
+.cm-toolbar .tbtn.danger:hover {
+  color: #ff7875;
+  border-color: #ff7875;
+  background: #ff787514;
+}
+.cm-toolbar .tbtn.active {
+  border-color: #22d3ee;
+  color: #fff;
+  background: #22d3ee1a;
+}
+.cm-toolbar .tbtn.icon {
+  padding: 7px 9px;
+}
+.cm-toolbar .tbtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.cm-toolbar .tdiv {
+  width: 1px;
+  height: 20px;
+  background: #ffffff1f;
+}
+.cm-toolbar .tspacer {
+  flex: 1;
+}
+.cm-pane {
+  background: #0a0d17;
+  border: 1px solid #ffffff14;
+  border-radius: 10px;
+  padding: 10px;
+}
+.cm-pane-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+.cm-pane-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* ---- Card edit modal (方案二 · 分屏暗色 Pro) ---- */
 .cm-modal .ant-modal-content {
   background: #0f1320;
