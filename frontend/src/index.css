@@ -728,6 +728,46 @@ body {
   color: #b8c1d4;
   line-height: 1.6;
 }
+.cm-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cm-comment {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+.cm-comment-body {
+  flex: 1;
+  min-width: 0;
+  background: #ffffff08;
+  border: 1px solid #ffffff12;
+  border-radius: 10px;
+  padding: 8px 11px;
+}
+.cm-comment-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.cm-comment-head b {
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+}
+.cm-comment-head .tm {
+  color: #707892;
+  font-size: 12px;
+}
+.cm-comment-text {
+  font-size: 14px;
+  color: #b8c1d4;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .cm-file {
   display: inline-flex;
   gap: 7px;

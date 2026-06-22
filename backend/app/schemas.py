@@ -126,6 +126,13 @@ class ApplicationOut(BaseModel):
     created_at: datetime
 
 
+class CommentOut(BaseModel):
+    id: int
+    author: UserOut
+    body: str
+    created_at: datetime
+
+
 class ChecklistItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -149,6 +156,7 @@ class TaskDetailOut(TaskOut):
     applications: list[ApplicationOut]
     checklists: list[ChecklistOut] = []
     attachments: list[AttachmentOut] = []
+    comments: list[CommentOut] = []
 
 
 # ---- request bodies ----
@@ -285,6 +293,10 @@ class SubmitIn(BaseModel):
 class ReviewIn(BaseModel):
     approve: bool
     comment: str | None = None
+
+
+class CommentIn(BaseModel):
+    comment: str
 
 
 # ---- round-2 request bodies / outputs ----

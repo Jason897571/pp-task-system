@@ -773,3 +773,30 @@ def test_archive_columns_are_per_board_and_track_rename(client, world):
     cols = client.get(f"/api/boards/{archive['id']}/columns", headers=sup).json()
     assert any(c["name"] == "新看板名" for c in cols)
     assert all(c["name"] != src_name for c in cols)
+
+
+def test_admin_comment_notifies_assignee(client, world):
+    admin = auth_header(client, "admin", "pw")
+    member = auth_header(client, "member", "pw")
+    t = _assigned_task(client, world)  # assigned to member
+
+    r = client.post(
+        f"/api/tasks/{t['id']}/comment", headers=admin, json={"comment": "请补充测试用例"}
+    )
+    assert r.status_code == 200
+
+    notifs = client.get("/api/notifications", headers=member).json()
+    assert any(n["type"] == "comment" and "请补充测试用例" in n["message"] for n in notifs)
+
+    # the comment is also shown on the card (under 产出), visible to the assignee
+    detail = client.get(f"/api/tasks/{t['id']}", headers=member).json()
+    assert any(c["body"] == "请补充测试用例" for c in detail["comments"])
+    assert detail["comments"][0]["author"]["full_name"]
+
+    # empty comment rejected; members cannot comment
+    assert client.post(
+        f"/api/tasks/{t['id']}/comment", headers=admin, json={"comment": "   "}
+    ).status_code == 400
+    assert client.post(
+        f"/api/tasks/{t['id']}/comment", headers=member, json={"comment": "x"}
+    ).status_code in (401, 403)

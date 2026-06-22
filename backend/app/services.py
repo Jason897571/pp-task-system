@@ -233,7 +233,7 @@ def serialize_task(db: Session, task: Task):
 def serialize_task_detail(db: Session, task: Task):
     """Build a TaskDetailOut: Task fields + deliverables(+attachments)/applications/
     checklists/attachments."""
-    from app.schemas import AttachmentOut, DeliverableOut, TaskDetailOut
+    from app.schemas import AttachmentOut, CommentOut, DeliverableOut, TaskDetailOut, UserOut
 
     base = serialize_task(db, task).model_dump()
 
@@ -253,6 +253,25 @@ def serialize_task_detail(db: Session, task: Task):
         AttachmentOut.model_validate(a).model_dump()
         for a in attachments_for(db, "task", task.id)
     ]
+
+    # Comments are the "commented" entries of the activity log, oldest first.
+    acts = db.scalars(
+        select(TaskActivity)
+        .where(TaskActivity.task_id == task.id, TaskActivity.action == "commented")
+        .order_by(TaskActivity.created_at, TaskActivity.id)
+    ).all()
+    comments = []
+    for a in acts:
+        author = db.get(User, a.actor_id)
+        comments.append(
+            CommentOut(
+                id=a.id,
+                author=UserOut.model_validate(author),
+                body=a.comment or "",
+                created_at=a.created_at,
+            ).model_dump()
+        )
+    base["comments"] = comments
     return TaskDetailOut.model_validate(base)
 
 

@@ -30,6 +30,7 @@ function makeTask(over: Partial<TaskDetail>): TaskDetail {
     applications: [],
     checklists: [],
     attachments: [],
+    comments: [],
     ...over,
   }
 }
@@ -53,6 +54,7 @@ function renderActions(
         onReview={noop}
         onApprove={noop}
         onAssign={noop}
+        onComment={noop}
       />
     </AntApp>,
   )

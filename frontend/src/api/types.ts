@@ -132,6 +132,13 @@ export interface Application {
   created_at: string
 }
 
+export interface Comment {
+  id: number
+  author: User
+  body: string
+  created_at: string
+}
+
 export interface ChecklistItem {
   id: number
   content: string
@@ -151,6 +158,7 @@ export interface TaskDetail extends Task {
   applications: Application[]
   checklists: Checklist[]
   attachments: Attachment[]
+  comments: Comment[]
 }
 
 // Round-2: 每周必做 (recurring) templates.

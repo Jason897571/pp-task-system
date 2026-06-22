@@ -31,6 +31,15 @@ Object.defineProperty(globalThis, 'localStorage', {
   writable: true,
 })
 
+// antd's auto-size textarea observes element size; jsdom has no ResizeObserver.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}
+
 // antd's responsive hooks call window.matchMedia, which jsdom doesn't implement.
 if (typeof window !== 'undefined' && !window.matchMedia) {
   Object.defineProperty(window, 'matchMedia', {

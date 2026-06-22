@@ -122,6 +122,9 @@ export const submitTask = (id: number, note: string) =>
 export const reviewTask = (id: number, body: { approve: boolean; comment?: string }) =>
   api.post<Task>(`/tasks/${id}/review`, body).then((r) => r.data)
 
+export const commentTask = (id: number, comment: string) =>
+  api.post<Task>(`/tasks/${id}/comment`, { comment }).then((r) => r.data)
+
 export const assignTask = (id: number, assignee_id: number) =>
   api.post<Task>(`/tasks/${id}/assign`, { assignee_id }).then((r) => r.data)
 

@@ -16,6 +16,7 @@ from app.models import (
 from app.schemas import (
     ApproveIn,
     AssignIn,
+    CommentIn,
     MoveBoardIn,
     MoveIn,
     ReviewIn,
@@ -436,6 +437,30 @@ def review_task(
         if task.assignee_id is not None:
             notify(db, task.assignee_id, "reviewed", f"任务「{task.title}」被打回：{body.comment}", task.id)
 
+    db.commit()
+    db.refresh(task)
+    return serialize_task(db, task)
+
+
+@router.post("/tasks/{task_id}/comment", response_model=TaskOut)
+def comment_task(
+    task_id: int,
+    body: CommentIn,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Admin/super leaves a comment on a card; the assignee is notified."""
+    task = db.get(Task, task_id)
+    if task is None or task.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not admin_can_touch_task(user, task):
+        raise HTTPException(status_code=403, detail="无权评论该任务")
+    text = body.comment.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="评论不能为空")
+    log_activity(db, task, user, "commented", comment=text)
+    if task.assignee_id is not None and task.assignee_id != user.id:
+        notify(db, task.assignee_id, "comment", f"任务「{task.title}」收到评论：{text}", task.id)
     db.commit()
     db.refresh(task)
     return serialize_task(db, task)

@@ -18,6 +18,7 @@ interface Props {
   onReview: (approve: boolean, comment?: string) => void
   onApprove: (approve: boolean, assigneeId?: number) => void
   onAssign: (assigneeId: number) => void
+  onComment: (text: string) => void
 }
 
 const LABELS: Record<ActionKey, string> = {
@@ -38,6 +39,7 @@ export function CardActions(props: Props) {
 
   const [reviewRejectOpen, setReviewRejectOpen] = useState(false)
   const [reviewComment, setReviewComment] = useState('')
+  const [comment, setComment] = useState('')
   const [assignTarget, setAssignTarget] = useState<number | undefined>()
 
   if (actions.length === 0) {
@@ -78,6 +80,25 @@ export function CardActions(props: Props) {
             onClick={() => setReviewRejectOpen(true)}
           >
             ↩ 打回重做
+          </Button>
+          <Input.TextArea
+            data-action="comment-input"
+            rows={2}
+            placeholder="给负责人留个评论（会发送到 ta 的通知）…"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+          />
+          <Button
+            data-action="comment-send"
+            block
+            loading={busy}
+            disabled={!comment.trim()}
+            onClick={() => {
+              props.onComment(comment.trim())
+              setComment('')
+            }}
+          >
+            💬 发送评论
           </Button>
         </>
       )}

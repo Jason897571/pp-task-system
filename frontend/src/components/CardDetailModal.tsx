@@ -7,6 +7,7 @@ import {
   applyTask,
   approveTask,
   assignTask,
+  commentTask,
   deleteTask,
   getAssignableUsers,
   getTask,
@@ -95,6 +96,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
     mutationFn: (b: { approve: boolean; assignee_id?: number }) => approveTask(taskId, b),
   })
   const assignM = useMutation({ mutationFn: (id: number) => assignTask(taskId, id) })
+  const commentM = useMutation({ mutationFn: (text: string) => commentTask(taskId, text) })
   const updateM = useMutation({
     mutationFn: (body: { description?: string; due_date?: string | null; priority?: string }) =>
       updateTask(taskId, body),
@@ -236,6 +238,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
         )
       }
       onAssign={(id) => wrap(() => assignM.mutateAsync(id), '已指派')}
+      onComment={(text) => wrap(() => commentM.mutateAsync(text), '评论已发送')}
     />
   )
 
@@ -466,6 +469,33 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                   )
                 })}
               </div>
+            )}
+
+            {task.comments.length > 0 && (
+              <section className="cd-sec" style={{ marginTop: 14 }}>
+                <div className="cd-sec-h">
+                  <span className="ic">💬</span>留言
+                </div>
+                <div className="cm-comments">
+                  {task.comments.map((c) => (
+                    <div key={c.id} className="cm-comment">
+                      <span
+                        className="av-sm"
+                        style={{ width: 20, height: 20, background: avatarColor(c.author.id) }}
+                      >
+                        {initial(c.author.full_name)}
+                      </span>
+                      <div className="cm-comment-body">
+                        <div className="cm-comment-head">
+                          <b>{c.author.full_name}</b>
+                          <span className="tm">{dueLabel(c.created_at)}</span>
+                        </div>
+                        <div className="cm-comment-text">{c.body}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
 
             {canCompose && (
