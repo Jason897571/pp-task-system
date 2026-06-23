@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, type ClipboardEvent } from 'react'
 import { Button, Input, Modal, Popconfirm, Select, Upload, App as AntApp } from 'antd'
 import type { UploadFile } from 'antd'
 import type { TaskDetail, User } from '../api/types'
 import { visibleActions } from '../lib/actions'
+import { imagesFromClipboard } from '../lib/clipboard'
 
 interface Props {
   task: TaskDetail
@@ -49,32 +50,91 @@ export function CardActions(props: Props) {
 
   const toggle = (p: Exclude<Pane, null>) => setPane(pane === p ? null : p)
 
-  // ---- members / no-toolbar contexts: single primary button ----
-  if (!hasToolbar) {
-    return (
-      <div className="modal-action-grp">
-        {actions.includes('start') && (
-          <Button data-action="start" type="primary" block loading={busy} onClick={props.onStart}>
-            ▶ 开始
-          </Button>
-        )}
-        {actions.includes('apply') && (
-          <Button data-action="apply" type="primary" block loading={busy} onClick={props.onApply}>
-            🙋 申请
-          </Button>
-        )}
-        {actions.length === 0 && (
-          <div style={{ color: 'var(--subtle)', fontSize: 13 }}>无可用动作</div>
-        )}
-      </div>
-    )
-  }
-
   const sendComment = () => {
     const files = commentFiles.map((f) => f.originFileObj as File).filter(Boolean)
     props.onComment(comment.trim(), files)
     setComment('')
     setCommentFiles([])
+  }
+
+  // Paste an image into the comment box → stage it; it uploads with the comment on send.
+  const onCommentPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const imgs = imagesFromClipboard(e)
+    if (imgs.length === 0) return
+    e.preventDefault()
+    setCommentFiles((prev) => [
+      ...prev,
+      ...imgs.map((f) => ({
+        uid: f.name,
+        name: f.name,
+        status: 'done' as const,
+        originFileObj: f as never,
+      })),
+    ])
+    message.success(`已粘贴 ${imgs.length} 张图片，发送评论时一并上传`)
+  }
+
+  // Comment composer — available to everyone who can see the card (members included).
+  const commentPane = pane === 'comment' && (
+    <div className="cm-pane">
+      <Input.TextArea
+        data-action="comment-input"
+        autoSize={{ minRows: 2, maxRows: 6 }}
+        placeholder="给负责人留个评论（可粘贴图片 / 附文件，会发送到 ta 的通知）…"
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        onPaste={onCommentPaste}
+      />
+      <div className="cm-pane-foot">
+        <Upload
+          fileList={commentFiles}
+          beforeUpload={() => false}
+          onChange={({ fileList }) => setCommentFiles(fileList)}
+          multiple
+        >
+          <Button size="small">📎 附件</Button>
+        </Upload>
+        <Button
+          data-action="comment-send"
+          type="primary"
+          size="small"
+          loading={busy}
+          disabled={!comment.trim()}
+          onClick={sendComment}
+        >
+          💬 发送评论
+        </Button>
+      </div>
+    </div>
+  )
+
+  // ---- members / no-toolbar contexts: primary button + comment ----
+  if (!hasToolbar) {
+    return (
+      <div className="cm-actionbar">
+        <div className="modal-action-grp">
+          {actions.includes('start') && (
+            <Button data-action="start" type="primary" block loading={busy} onClick={props.onStart}>
+              ▶ 开始
+            </Button>
+          )}
+          {actions.includes('apply') && (
+            <Button data-action="apply" type="primary" block loading={busy} onClick={props.onApply}>
+              🙋 申请
+            </Button>
+          )}
+          <Button
+            data-action="comment"
+            block
+            className={pane === 'comment' ? 'cm-comment-on' : ''}
+            onClick={() => toggle('comment')}
+          >
+            💬 评论
+          </Button>
+        </div>
+        {commentPane}
+      </div>
+    )
   }
 
   return (
@@ -144,37 +204,7 @@ export function CardActions(props: Props) {
         )}
       </div>
 
-      {pane === 'comment' && (
-        <div className="cm-pane">
-          <Input.TextArea
-            data-action="comment-input"
-            autoSize={{ minRows: 2, maxRows: 6 }}
-            placeholder="给负责人留个评论（会发送到 ta 的通知，可附文件）…"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-          />
-          <div className="cm-pane-foot">
-            <Upload
-              fileList={commentFiles}
-              beforeUpload={() => false}
-              onChange={({ fileList }) => setCommentFiles(fileList)}
-              multiple
-            >
-              <Button size="small">📎 附件</Button>
-            </Upload>
-            <Button
-              data-action="comment-send"
-              type="primary"
-              size="small"
-              loading={busy}
-              disabled={!comment.trim()}
-              onClick={sendComment}
-            >
-              💬 发送评论
-            </Button>
-          </div>
-        </div>
-      )}
+      {commentPane}
 
       {pane === 'assign' && (
         <div className="cm-pane">

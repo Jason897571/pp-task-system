@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import { App as AntApp } from 'antd'
 import { CardActions } from './CardActions'
 import type { ColumnKind, TaskDetail, User } from '../api/types'
@@ -71,11 +71,11 @@ describe('CardActions rendering', () => {
     expect(container.querySelector('[data-action="review-approve"]')).not.toBeInTheDocument()
   })
 
-  it('member sees no 开始 in start column when not assignee', () => {
+  it('member sees no 开始 in start column when not assignee, but can still comment', () => {
     const task = makeTask({ assignee: { id: 2, full_name: 'O', role: 'member', department_id: 1 } })
     const { container } = renderActions(task, 'start', member)
     expect(container.querySelector('[data-action="start"]')).not.toBeInTheDocument()
-    expect(screen.getByText('无可用动作')).toBeInTheDocument()
+    expect(container.querySelector('[data-action="comment"]')).toBeInTheDocument()
   })
 
   it('admin sees 审核 buttons only in a requires-review column', () => {

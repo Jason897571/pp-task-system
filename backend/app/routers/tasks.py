@@ -449,22 +449,24 @@ def review_task(
 def comment_task(
     task_id: int,
     body: CommentIn,
-    user: User = Depends(require_admin),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Admin/super leaves a comment on a card; the assignee is notified. Returns the
-    new comment (with its id) so the client can attach files to it."""
+    """Anyone who can see the card may comment on it (admins, the assignee, the
+    creator). The assignee is notified. Returns the new comment (with its id) so
+    the client can attach files to it."""
     task = db.get(Task, task_id)
     if task is None or task.deleted_at is not None:
         raise HTTPException(status_code=404, detail="任务不存在")
-    if not admin_can_touch_task(user, task):
+    if not _visible_to(db, user, task):
         raise HTTPException(status_code=403, detail="无权评论该任务")
     text = body.comment.strip()
     if not text:
         raise HTTPException(status_code=400, detail="评论不能为空")
     act = log_activity(db, task, user, "commented", comment=text)
-    if task.assignee_id is not None and task.assignee_id != user.id:
-        notify(db, task.assignee_id, "comment", f"任务「{task.title}」收到评论：{text}", task.id)
+    # Notify the people involved (assignee + creator), minus the commenter.
+    for uid in {task.assignee_id, task.creator_id} - {None, user.id}:
+        notify(db, uid, "comment", f"任务「{task.title}」收到评论：{text}", task.id)
     db.commit()
     db.refresh(act)
     return CommentOut(

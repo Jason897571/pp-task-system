@@ -805,12 +805,23 @@ def test_admin_comment_notifies_assignee(client, world):
     c = next(c for c in detail["comments"] if c["id"] == cid)
     assert len(c["attachments"]) == 1 and c["attachments"][0]["filename"] == "note.png"
 
-    # empty comment rejected; members cannot comment
+    # empty comment rejected
     assert client.post(
         f"/api/tasks/{t['id']}/comment", headers=admin, json={"comment": "   "}
     ).status_code == 400
+
+    # the assignee (a member) can comment; the creator (admin) is notified
+    rm = client.post(
+        f"/api/tasks/{t['id']}/comment", headers=member, json={"comment": "已修复，请复查"}
+    )
+    assert rm.status_code == 200
+    admin_notifs = client.get("/api/notifications", headers=admin).json()
+    assert any(n["type"] == "comment" and "已修复，请复查" in n["message"] for n in admin_notifs)
+
+    # an uninvolved member cannot comment on a card they can't see
+    member2 = auth_header(client, "member2", "pw")
     assert client.post(
-        f"/api/tasks/{t['id']}/comment", headers=member, json={"comment": "x"}
+        f"/api/tasks/{t['id']}/comment", headers=member2, json={"comment": "x"}
     ).status_code in (401, 403)
 
 
