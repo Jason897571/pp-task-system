@@ -85,6 +85,18 @@ export function AppShell() {
     onError: (e) => message.error(errMessage(e)),
   })
 
+  const renameBoardM = useMutation({
+    mutationFn: ({ id, name }: { id: number; name: string }) => updateBoard(id, { name }),
+    onSuccess: () => {
+      message.success('看板已改名')
+      // Refresh boards (sidebar) and any open board's columns — the archive
+      // board re-reads its per-source column names from the live board name.
+      qc.invalidateQueries({ queryKey: ['boards'] })
+      qc.invalidateQueries({ queryKey: ['columns'] })
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
+
   const reorderM = useMutation({
     mutationFn: (ids: number[]) => reorderBoards(ids),
     onError: (e) => {
@@ -198,6 +210,7 @@ export function AppShell() {
                     onOpen={() => navigate(`/board/${b.id}`)}
                     onDelete={() => deleteBoardM.mutate(b.id)}
                     onSetIcon={(icon) => setIconM.mutate({ id: b.id, icon })}
+                    onRename={(name) => renameBoardM.mutate({ id: b.id, name })}
                   />
                 ))}
               </SortableContext>
@@ -311,10 +324,23 @@ interface SortableBoardItemProps {
   onOpen: () => void
   onDelete: () => void
   onSetIcon: (icon: string) => void
+  onRename: (name: string) => void
 }
 
-function SortableBoardItem({ board, active, onOpen, onDelete, onSetIcon }: SortableBoardItemProps) {
+function SortableBoardItem({ board, active, onOpen, onDelete, onSetIcon, onRename }: SortableBoardItemProps) {
   const [iconOpen, setIconOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draftName, setDraftName] = useState(board.name)
+
+  const startEdit = () => {
+    setDraftName(board.name)
+    setEditing(true)
+  }
+  const commitEdit = () => {
+    const next = draftName.trim()
+    if (next && next !== board.name) onRename(next)
+    setEditing(false)
+  }
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: board.id })
   const style: CSSProperties = {
@@ -366,14 +392,35 @@ function SortableBoardItem({ board, active, onOpen, onDelete, onSetIcon }: Sorta
           {board.icon || '📋'}
         </span>
       </Popover>
-      <span
-        style={{ flex: 1, cursor: 'grab', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', marginLeft: 4 }}
-        onClick={onOpen}
-        {...attributes}
-        {...listeners}
-      >
-        {board.name}
-      </span>
+      {editing ? (
+        <Input
+          size="small"
+          autoFocus
+          variant="borderless"
+          style={{ flex: 1, minWidth: 0, marginLeft: 4, padding: '0 4px', height: 22 }}
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          onPressEnter={commitEdit}
+          onBlur={commitEdit}
+          onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <span
+          style={{ flex: 1, cursor: 'grab', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', marginLeft: 4 }}
+          title="双击改名"
+          onClick={onOpen}
+          onDoubleClick={(e) => {
+            e.stopPropagation()
+            startEdit()
+          }}
+          {...attributes}
+          {...listeners}
+        >
+          {board.name}
+        </span>
+      )}
       <Popconfirm
         title="删除看板"
         description={`确定删除「${board.name}」？其卡片将一并删除。`}
