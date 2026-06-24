@@ -9,6 +9,7 @@ from app.routers import (
     auth,
     boards,
     checklists,
+    export,
     files,
     notifications,
     pool,
@@ -50,6 +51,7 @@ app.include_router(recurring.router)
 app.include_router(files.router)
 app.include_router(notifications.router)
 app.include_router(stats.router)
+app.include_router(export.router)
 
 
 @app.get("/health")

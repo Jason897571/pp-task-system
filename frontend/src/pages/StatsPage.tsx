@@ -1,7 +1,15 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Empty, Modal, Select, Spin, Table } from 'antd'
-import { getBoards, getMemberStats, getStatsOverview, getTasks } from '../api/endpoints'
+import { Button, Empty, Modal, Select, Spin, Table, App as AntApp } from 'antd'
+import {
+  exportWeekly,
+  getBoards,
+  getMemberStats,
+  getStatsOverview,
+  getTasks,
+} from '../api/endpoints'
+import { errMessage } from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 import type { MemberStats, Task } from '../api/types'
 
 function StatCard({ label, value, accent }: { label: string; value: number; accent?: string }) {
@@ -77,10 +85,34 @@ function OverviewSection({ boardId }: { boardId: number }) {
 
 // 统计面板页 (admin / super_admin) — spec §6.
 export function StatsPage() {
+  const { user } = useAuth()
+  const { message } = AntApp.useApp()
   const { data: boards = [] } = useQuery({ queryKey: ['boards'], queryFn: getBoards })
   const [boardId, setBoardId] = useState<number | undefined>()
   const [memberTask, setMemberTask] = useState<MemberStats | null>(null)
+  const [exporting, setExporting] = useState(false)
   const effectiveBoardId = boardId ?? boards[0]?.id
+
+  const onExport = async () => {
+    setExporting(true)
+    try {
+      const data = await exportWeekly()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `周报-${data.week.this_week.start}_至_${data.week.this_week.end}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      message.success(
+        `已导出：本周完成 ${data.counts.this_week_completed} · 进行/未开始 ${data.counts.in_progress_or_todo} · 上周完成 ${data.counts.last_week_completed}`,
+      )
+    } catch (e) {
+      message.error(errMessage(e, '导出失败'))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const { data: members = [] } = useQuery({
     queryKey: ['stats-members'],
@@ -104,6 +136,12 @@ export function StatsPage() {
           onChange={setBoardId}
           options={boards.map((b) => ({ value: b.id, label: b.name }))}
         />
+        <span style={{ flex: 1 }} />
+        {user?.role === 'super_admin' && (
+          <Button loading={exporting} onClick={onExport}>
+            ⬇ 导出本周报表（JSON）
+          </Button>
+        )}
       </div>
 
       {effectiveBoardId ? <OverviewSection boardId={effectiveBoardId} /> : <Empty description="暂无看板" />}

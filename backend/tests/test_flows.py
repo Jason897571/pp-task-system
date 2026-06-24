@@ -883,3 +883,62 @@ def test_duplicate_task_copies_requirement_only(client, world):
     assert client.post(
         f"/api/tasks/{src['id']}/duplicate", headers=member, json={"assignee_id": world["member"].id}
     ).status_code in (401, 403)
+
+
+def test_export_weekly_buckets(client, db, world):
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from app.models import Task
+
+    sh = ZoneInfo("Asia/Shanghai")
+    now_local = datetime.now(sh).replace(tzinfo=None)
+    this_monday = now_local.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
+        days=now_local.weekday()
+    )
+    cols = world["cols"]
+
+    def mk(title, *, lifecycle, column_id, updated):
+        t = Task(
+            title=title,
+            creator_id=world["member"].id,
+            assignee_id=world["member"].id,
+            department_id=world["rnd"].id,
+            board_id=world["board"].id,
+            column_id=column_id,
+            lifecycle=lifecycle,
+            created_at=updated,
+            updated_at=updated,
+        )
+        db.add(t)
+        db.flush()
+        return t
+
+    mk("本周完成", lifecycle="on_board", column_id=cols["done"].id, updated=this_monday + timedelta(days=1))
+    mk("上周完成", lifecycle="on_board", column_id=cols["done"].id, updated=this_monday - timedelta(days=2))
+    mk("很久以前完成", lifecycle="on_board", column_id=cols["done"].id, updated=this_monday - timedelta(days=30))
+    mk("进行中", lifecycle="on_board", column_id=cols["doing"].id, updated=now_local)
+    mk("待认领", lifecycle="open", column_id=None, updated=now_local)
+    mk("待审批", lifecycle="pending_approval", column_id=None, updated=now_local)
+    db.commit()
+
+    super_h = auth_header(client, "super", "pw")
+    r = client.get("/api/export/weekly", headers=super_h)
+    assert r.status_code == 200
+    data = r.json()
+
+    this_done = {t["title"] for t in data["this_week_completed"]}
+    last_done = {t["title"] for t in data["last_week_completed"]}
+    snapshot = {t["title"] for t in data["in_progress_or_todo"]}
+
+    assert this_done == {"本周完成"}
+    assert last_done == {"上周完成"}
+    assert snapshot == {"进行中", "待认领", "待审批"}
+    # "很久以前完成" is completed but outside both weekly windows → in no bucket
+    assert "很久以前完成" not in this_done | last_done | snapshot
+    # completed entries carry a completion timestamp; counts mirror the lists
+    assert all("completed_at" in t for t in data["this_week_completed"])
+    assert data["counts"]["this_week_completed"] == 1
+
+    # super-only
+    assert client.get("/api/export/weekly", headers=auth_header(client, "admin", "pw")).status_code == 403

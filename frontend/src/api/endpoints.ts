@@ -30,6 +30,7 @@ import type {
   Notification,
   StatsOverview,
   MemberStats,
+  WeeklyExport,
 } from './types'
 
 // --- Auth ---
@@ -245,3 +246,8 @@ export const getStatsOverview = (boardId: number) =>
 
 export const getMemberStats = () =>
   api.get<MemberStats[]>('/stats/members').then((r) => r.data)
+
+// Weekly export (super_admin): completed-this-week / in-progress-or-todo snapshot /
+// completed-last-week task lists as a JSON object the client saves to a file.
+export const exportWeekly = () =>
+  api.get<WeeklyExport>('/export/weekly').then((r) => r.data)

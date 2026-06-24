@@ -215,6 +215,41 @@ export interface MemberStats {
   overdue: number
 }
 
+export interface WeeklyExportTask {
+  id: number
+  title: string
+  description: string | null
+  priority: string
+  status: string
+  board: string | null
+  column: string | null
+  assignee: string | null
+  creator: string | null
+  is_mandatory: boolean
+  is_rework: boolean
+  tags: string[]
+  due_date: string | null
+  created_at: string | null
+  updated_at: string | null
+  completed_at?: string | null
+}
+
+export interface WeeklyExport {
+  generated_at: string
+  week: {
+    this_week: { start: string; end: string }
+    last_week: { start: string; end: string }
+  }
+  counts: {
+    this_week_completed: number
+    in_progress_or_todo: number
+    last_week_completed: number
+  }
+  this_week_completed: WeeklyExportTask[]
+  in_progress_or_todo: WeeklyExportTask[]
+  last_week_completed: WeeklyExportTask[]
+}
+
 export interface AuthResponse {
   access_token: string
   token_type: string
