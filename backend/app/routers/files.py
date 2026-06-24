@@ -25,6 +25,8 @@ ALLOWED_CONTENT_TYPES = {
     "image/webp",
     "text/plain",
     "text/csv",
+    "text/markdown",
+    "text/x-markdown",
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.ms-excel",
@@ -34,6 +36,10 @@ ALLOWED_CONTENT_TYPES = {
     "application/zip",
     "application/x-zip-compressed",
 }
+
+# Some file types (notably .md) are reported with an empty or generic
+# content_type by the browser/OS, so allow them by extension as a fallback.
+ALLOWED_EXTENSIONS = {".md", ".markdown"}
 
 
 def _task_for_owner(db: Session, owner_type: str, owner_id: int) -> Task | None:
@@ -82,7 +88,8 @@ def upload_file(
     if not can_edit_task(user, task):
         raise HTTPException(status_code=403, detail="无权上传到该任务")
 
-    if file.content_type not in ALLOWED_CONTENT_TYPES:
+    ext = Path(file.filename or "").suffix.lower()
+    if file.content_type not in ALLOWED_CONTENT_TYPES and ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail="不支持的文件类型")
 
     data = file.file.read()

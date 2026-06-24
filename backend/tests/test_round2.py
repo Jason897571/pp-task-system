@@ -321,6 +321,23 @@ def test_file_oversize_and_bad_type(client, world):
     assert big.status_code == 400
 
 
+def test_markdown_upload(client, world):
+    admin = auth_header(client, "admin", "pw")
+    t = _assigned_task(client, world)
+
+    # proper markdown MIME
+    r = _upload(
+        client, admin, "task", t["id"], content=b"# title", name="readme.md", ctype="text/markdown"
+    )
+    assert r.status_code == 200, r.text
+
+    # browsers/OS often report an empty/generic type for .md — allowed by extension
+    r2 = _upload(
+        client, admin, "task", t["id"], content=b"# t", name="notes.md", ctype="application/octet-stream"
+    )
+    assert r2.status_code == 200, r2.text
+
+
 def test_deliverable_attachment(client, world):
     admin = auth_header(client, "admin", "pw")
     member = auth_header(client, "member", "pw")
