@@ -11,6 +11,7 @@ from app.models import (
     BoardColumn,
     Deliverable,
     Task,
+    TaskLink,
     User,
 )
 from app.schemas import (
@@ -18,6 +19,8 @@ from app.schemas import (
     AssignIn,
     CommentIn,
     CommentOut,
+    LinkedTaskOut,
+    LinkIn,
     MoveBoardIn,
     MoveIn,
     ReviewIn,
@@ -31,6 +34,7 @@ from app.schemas import (
 from app.services import (
     admin_can_touch_task,
     board_can_see,
+    can_edit_task,
     column_of_kind,
     copy_requirement_children,
     hard_delete_task,
@@ -38,6 +42,7 @@ from app.services import (
     notify,
     review_admin_for,
     review_column,
+    serialize_linked_task,
     serialize_task,
     serialize_task_detail,
     start_column,
@@ -476,6 +481,60 @@ def comment_task(
         created_at=act.created_at,
         attachments=[],
     )
+
+
+@router.post("/tasks/{task_id}/links", response_model=LinkedTaskOut)
+def link_task(
+    task_id: int,
+    body: LinkIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Relate another task to this one (symmetric). Editors of the card (managers
+    or the assignee) may link any task they can see. Returns the linked task."""
+    task = db.get(Task, task_id)
+    if task is None or task.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not can_edit_task(user, task):
+        raise HTTPException(status_code=403, detail="无权关联该任务")
+    if body.linked_task_id == task_id:
+        raise HTTPException(status_code=400, detail="不能关联任务自身")
+    other = db.get(Task, body.linked_task_id)
+    if other is None or other.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="关联的任务不存在")
+    if not _visible_to(db, user, other):
+        raise HTTPException(status_code=403, detail="无权关联不可见的任务")
+    a, b = sorted((task_id, other.id))
+    exists = db.scalar(
+        select(TaskLink).where(TaskLink.task_a_id == a, TaskLink.task_b_id == b)
+    )
+    if exists is None:
+        db.add(TaskLink(task_a_id=a, task_b_id=b))
+        db.commit()
+    return serialize_linked_task(db, other)
+
+
+@router.delete("/tasks/{task_id}/links/{linked_id}")
+def unlink_task(
+    task_id: int,
+    linked_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Remove the relationship (symmetric — drops it from both cards)."""
+    task = db.get(Task, task_id)
+    if task is None or task.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not can_edit_task(user, task):
+        raise HTTPException(status_code=403, detail="无权修改该任务的关联")
+    a, b = sorted((task_id, linked_id))
+    row = db.scalar(
+        select(TaskLink).where(TaskLink.task_a_id == a, TaskLink.task_b_id == b)
+    )
+    if row is not None:
+        db.delete(row)
+        db.commit()
+    return {"ok": True}
 
 
 @router.post("/tasks/{task_id}/duplicate", response_model=TaskOut)

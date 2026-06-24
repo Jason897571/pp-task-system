@@ -23,6 +23,7 @@ import type { BoardColumn, User } from '../api/types'
 import { CardActions } from './CardActions'
 import { ChecklistsSection } from './ChecklistsSection'
 import { AttachmentsSection, AttachmentList } from './AttachmentsSection'
+import { LinkedTasksSection } from './LinkedTasksSection'
 import {
   avatarColor,
   dueLabel,
@@ -261,6 +262,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
           <div className="cm-req">
             <div className="cm-zonetag">需求 · REQUIREMENT</div>
             <div className="cm-titlerow">
+              <span className="cm-no" title="任务编号">#{task.id}</span>
               <h2 className="cm-title">{task.title}</h2>
             </div>
             <div className="cm-chips">
@@ -398,6 +400,15 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                 taskId={task.id}
                 checklists={task.checklists}
                 canEdit={isManager}
+                onChanged={invalidate}
+              />
+            )}
+
+            {(canEdit || task.links.length > 0) && (
+              <LinkedTasksSection
+                taskId={task.id}
+                links={task.links}
+                canEdit={canEdit}
                 onChanged={invalidate}
               />
             )}

@@ -942,3 +942,39 @@ def test_export_weekly_buckets(client, db, world):
 
     # super-only
     assert client.get("/api/export/weekly", headers=auth_header(client, "admin", "pw")).status_code == 403
+
+
+def test_task_links_symmetric(client, db, world):
+    admin = auth_header(client, "admin", "pw")
+    a = _assigned_task(client, world)
+    b = _assigned_task(client, world)
+
+    # link a -> b
+    r = client.post(f"/api/tasks/{a['id']}/links", headers=admin, json={"linked_task_id": b["id"]})
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] == b["id"]
+    assert "status" in r.json()
+
+    # symmetric: visible from both cards
+    da = client.get(f"/api/tasks/{a['id']}", headers=admin).json()
+    db_ = client.get(f"/api/tasks/{b['id']}", headers=admin).json()
+    assert [t["id"] for t in da["links"]] == [b["id"]]
+    assert [t["id"] for t in db_["links"]] == [a["id"]]
+
+    # cannot link to self / duplicate is idempotent
+    assert client.post(
+        f"/api/tasks/{a['id']}/links", headers=admin, json={"linked_task_id": a["id"]}
+    ).status_code == 400
+    again = client.post(f"/api/tasks/{a['id']}/links", headers=admin, json={"linked_task_id": b["id"]})
+    assert again.status_code == 200
+    assert len(client.get(f"/api/tasks/{a['id']}", headers=admin).json()["links"]) == 1
+
+    # unlink from the other side removes it for both
+    assert client.delete(f"/api/tasks/{b['id']}/links/{a['id']}", headers=admin).status_code == 200
+    assert client.get(f"/api/tasks/{a['id']}", headers=admin).json()["links"] == []
+
+    # a member who can't edit the card cannot link
+    other = auth_header(client, "member2", "pw")
+    assert client.post(
+        f"/api/tasks/{a['id']}/links", headers=other, json={"linked_task_id": b["id"]}
+    ).status_code in (401, 403)

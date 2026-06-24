@@ -152,12 +152,35 @@ class ChecklistOut(BaseModel):
     items: list[ChecklistItemOut] = []
 
 
+class LinkedTaskOut(BaseModel):
+    """Compact view of a related task, shown in the link list + read-only popup."""
+
+    id: int
+    title: str
+    lifecycle: str
+    status: str
+    board: str | None = None
+    column: str | None = None
+    assignee: UserOut | None = None
+    priority: str
+    due_date: datetime | None = None
+
+    @field_serializer("due_date")
+    def _serialize_utc(self, v: datetime | None) -> str | None:
+        if v is None:
+            return None
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v.isoformat()
+
+
 class TaskDetailOut(TaskOut):
     deliverables: list[DeliverableOut]
     applications: list[ApplicationOut]
     checklists: list[ChecklistOut] = []
     attachments: list[AttachmentOut] = []
     comments: list[CommentOut] = []
+    links: list[LinkedTaskOut] = []
 
 
 # ---- request bodies ----
@@ -298,6 +321,10 @@ class ReviewIn(BaseModel):
 
 class CommentIn(BaseModel):
     comment: str
+
+
+class LinkIn(BaseModel):
+    linked_task_id: int
 
 
 # ---- round-2 request bodies / outputs ----

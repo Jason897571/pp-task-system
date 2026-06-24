@@ -24,6 +24,7 @@ import type {
   ChecklistItem,
   Attachment,
   Comment,
+  LinkedTask,
   RecurringTask,
   CreateRecurringBody,
   UpdateRecurringBody,
@@ -129,6 +130,13 @@ export const commentTask = (id: number, comment: string) =>
 
 export const duplicateTask = (id: number, assignee_id: number) =>
   api.post<Task>(`/tasks/${id}/duplicate`, { assignee_id }).then((r) => r.data)
+
+// --- Related tasks (links) ---
+export const linkTask = (id: number, linked_task_id: number) =>
+  api.post<LinkedTask>(`/tasks/${id}/links`, { linked_task_id }).then((r) => r.data)
+
+export const unlinkTask = (id: number, linked_id: number) =>
+  api.delete<{ ok: boolean }>(`/tasks/${id}/links/${linked_id}`).then((r) => r.data)
 
 export const assignTask = (id: number, assignee_id: number) =>
   api.post<Task>(`/tasks/${id}/assign`, { assignee_id }).then((r) => r.data)

@@ -592,8 +592,91 @@ body {
 .cm-titlerow {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: 10px;
   margin: 9px 0 14px;
+}
+.cm-no {
+  flex: 0 0 auto;
+  margin-top: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #8fd6ff;
+  background: #22d3ee18;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+/* related tasks (links) */
+.link-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0;
+}
+.link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: #ffffff0d;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 4px 0 0;
+}
+.link-chip-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 320px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #cdd6e6;
+  font-size: 13px;
+  padding: 6px 8px;
+}
+.link-chip-main:hover .link-title {
+  text-decoration: underline;
+}
+.link-no {
+  color: #8fd6ff;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.link-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.link-status {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--subtle);
+  background: #ffffff12;
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+.link-preview .lp-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 12px;
+  word-break: break-word;
+}
+.lp-row {
+  display: flex;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.lp-k {
+  flex: 0 0 64px;
+  color: var(--subtle);
+}
+.lp-v {
+  flex: 1;
+  color: #dfe5f0;
+  word-break: break-word;
 }
 .cm-title {
   flex: 1;

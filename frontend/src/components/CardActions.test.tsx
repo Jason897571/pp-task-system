@@ -31,6 +31,7 @@ function makeTask(over: Partial<TaskDetail>): TaskDetail {
     checklists: [],
     attachments: [],
     comments: [],
+    links: [],
     ...over,
   }
 }

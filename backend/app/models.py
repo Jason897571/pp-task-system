@@ -196,6 +196,19 @@ class TaskActivity(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class TaskLink(Base):
+    """Symmetric "related task" link between two tasks. The pair is normalized so
+    task_a_id < task_b_id — one row per relationship, queried from either side."""
+
+    __tablename__ = "task_links"
+    __table_args__ = (UniqueConstraint("task_a_id", "task_b_id", name="uq_task_link_pair"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    task_a_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"), index=True)
+    task_b_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 # ---------------------------------------------------------------------------
 # DEFERRED models (schema completeness per spec §4). No endpoints in MVP.
 # ---------------------------------------------------------------------------

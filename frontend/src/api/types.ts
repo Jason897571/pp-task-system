@@ -160,6 +160,7 @@ export interface TaskDetail extends Task {
   checklists: Checklist[]
   attachments: Attachment[]
   comments: Comment[]
+  links: LinkedTask[]
 }
 
 // Round-2: 每周必做 (recurring) templates.
@@ -213,6 +214,18 @@ export interface MemberStats {
   done: number
   in_review: number
   overdue: number
+}
+
+export interface LinkedTask {
+  id: number
+  title: string
+  lifecycle: string
+  status: string
+  board: string | null
+  column: string | null
+  assignee: User | null
+  priority: string
+  due_date: string | null
 }
 
 export interface WeeklyExportTask {

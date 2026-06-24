@@ -21,6 +21,7 @@ from app.models import (
     Task,
     TaskActivity,
     TaskApplication,
+    TaskLink,
     TaskTag,
     User,
 )
@@ -276,9 +277,59 @@ def serialize_task(db: Session, task: Task):
     return TaskOut.model_validate(data)
 
 
+def task_status_label(task: Task, col: BoardColumn | None) -> str:
+    """Human status for the related-task popup / exports."""
+    if task.lifecycle == "open":
+        return "待认领"
+    if task.lifecycle == "pending_approval":
+        return "待审批"
+    if task.lifecycle == "declined":
+        return "已放弃"
+    if col is not None and (col.kind == "done" or col.is_final):
+        return "已完成"
+    return col.name if col and col.name else "进行中"
+
+
+def linked_tasks(db: Session, task_id: int) -> list[Task]:
+    """All tasks linked to this one (either direction), excluding trashed cards."""
+    rows = db.scalars(
+        select(TaskLink).where(
+            (TaskLink.task_a_id == task_id) | (TaskLink.task_b_id == task_id)
+        )
+    ).all()
+    other_ids = [r.task_b_id if r.task_a_id == task_id else r.task_a_id for r in rows]
+    if not other_ids:
+        return []
+    return list(
+        db.scalars(
+            select(Task)
+            .where(Task.id.in_(other_ids), Task.deleted_at.is_(None))
+            .order_by(Task.id)
+        ).all()
+    )
+
+
+def serialize_linked_task(db: Session, t: Task) -> dict:
+    from app.schemas import LinkedTaskOut, UserOut
+
+    board = db.get(Board, t.board_id)
+    col = db.get(BoardColumn, t.column_id) if t.column_id else None
+    return LinkedTaskOut(
+        id=t.id,
+        title=t.title,
+        lifecycle=t.lifecycle,
+        status=task_status_label(t, col),
+        board=board.name if board else None,
+        column=col.name if col else None,
+        assignee=UserOut.model_validate(t.assignee) if t.assignee else None,
+        priority=t.priority,
+        due_date=t.due_date,
+    ).model_dump()
+
+
 def serialize_task_detail(db: Session, task: Task):
     """Build a TaskDetailOut: Task fields + deliverables(+attachments)/applications/
-    checklists/attachments."""
+    checklists/attachments/comments/links."""
     from app.schemas import AttachmentOut, CommentOut, DeliverableOut, TaskDetailOut, UserOut
 
     base = serialize_task(db, task).model_dump()
@@ -322,6 +373,7 @@ def serialize_task_detail(db: Session, task: Task):
             ).model_dump()
         )
     base["comments"] = comments
+    base["links"] = [serialize_linked_task(db, lt) for lt in linked_tasks(db, task.id)]
     return TaskDetailOut.model_validate(base)
 
 
