@@ -1,4 +1,5 @@
-import { Popconfirm, Upload, App as AntApp } from 'antd'
+import { useEffect, useState } from 'react'
+import { Image, Popconfirm, Upload, App as AntApp } from 'antd'
 import { useMutation } from '@tanstack/react-query'
 import { deleteFile, downloadFile, uploadFile } from '../api/endpoints'
 import { errMessage } from '../api/client'
@@ -9,6 +10,8 @@ function fmtSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
+
+const isImage = (att: Attachment) => (att.content_type || '').startsWith('image/')
 
 // Triggers a browser download for an attachment (auth header added by axios interceptor).
 async function triggerDownload(att: Attachment, onError: (msg: string) => void) {
@@ -25,8 +28,48 @@ async function triggerDownload(att: Attachment, onError: (msg: string) => void) 
   }
 }
 
-// List of attachments with download. `pill` renders compact file pills (used in
-// the 产出 timeline). When `deletable`, each file gets a ✕ (uploader / managers).
+// Image attachment rendered inline: the file endpoint needs an auth header, so we
+// fetch the blob and hand antd <Image> an object URL (click = full-screen preview).
+function AttachmentThumb({ att }: { att: Attachment }) {
+  const [url, setUrl] = useState<string>()
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    let made: string | undefined
+    downloadFile(att.id)
+      .then(({ blob }) => {
+        if (!active) return
+        made = URL.createObjectURL(blob)
+        setUrl(made)
+      })
+      .catch(() => active && setFailed(true))
+    return () => {
+      active = false
+      if (made) URL.revokeObjectURL(made)
+    }
+  }, [att.id])
+
+  if (failed) {
+    return <span className="att-thumb-skel">🖼 {att.filename}（加载失败）</span>
+  }
+  if (!url) {
+    return <span className="att-thumb-skel">🖼 {att.filename}…</span>
+  }
+  return (
+    <Image
+      src={url}
+      alt={att.filename}
+      height={84}
+      className="att-thumb-img"
+      title={`${att.filename} · ${fmtSize(att.filesize)}`}
+    />
+  )
+}
+
+// List of attachments. Images show as preview thumbnails; other files keep the
+// download link. `pill` renders compact file pills (used in the 产出 timeline).
+// When `deletable`, each file gets a ✕ (uploader / managers).
 export function AttachmentList({
   attachments,
   pill = false,
@@ -48,7 +91,7 @@ export function AttachmentList({
       })
       .catch((e) => message.error(errMessage(e)))
 
-  const DeleteX = ({ att }: { att: Attachment }) =>
+  const DeleteX = ({ att, className = 'att-del' }: { att: Attachment; className?: string }) =>
     deletable ? (
       <Popconfirm
         title="删除附件"
@@ -58,17 +101,35 @@ export function AttachmentList({
         okButtonProps={{ danger: true }}
         onConfirm={() => del(att)}
       >
-        <span className="att-del" onClick={(e) => e.stopPropagation()} title="删除">
+        <span className={className} onClick={(e) => e.stopPropagation()} title="删除">
           ✕
         </span>
       </Popconfirm>
     ) : null
 
   if (attachments.length === 0) return null
+
+  const images = attachments.filter(isImage)
+  const files = attachments.filter((a) => !isImage(a))
+
+  const thumbs = images.length > 0 && (
+    <div className="att-thumbs">
+      <Image.PreviewGroup>
+        {images.map((att) => (
+          <span key={att.id} className="att-thumb">
+            <AttachmentThumb att={att} />
+            <DeleteX att={att} className="att-del att-thumb-del" />
+          </span>
+        ))}
+      </Image.PreviewGroup>
+    </div>
+  )
+
   if (pill) {
     return (
       <div>
-        {attachments.map((att) => (
+        {thumbs}
+        {files.map((att) => (
           <span key={att.id} className="cm-file-wrap">
             <button
               type="button"
@@ -86,7 +147,8 @@ export function AttachmentList({
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-      {attachments.map((att) => (
+      {thumbs}
+      {files.map((att) => (
         <div key={att.id} className="att-row">
           <a onClick={() => triggerDownload(att, message.error)} style={{ fontSize: 13 }}>
             📎 {att.filename}{' '}
