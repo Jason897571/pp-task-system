@@ -69,6 +69,7 @@ export function CardFront({
 
   return (
     <>
+      <div className="card-no" title="任务编号">#{task.id}</div>
       <div className="card-title">{task.title}</div>
       {(chips.length > 0 || task.assignee) && (
         <>
