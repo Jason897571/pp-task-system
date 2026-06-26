@@ -8,7 +8,7 @@ import {
 } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Empty, Spin, App as AntApp } from 'antd'
+import { Button, Empty, Segmented, Spin, App as AntApp } from 'antd'
 import {
   archiveNow,
   createColumn,
@@ -55,6 +55,8 @@ export function BoardPage() {
   const isArchive = !!board?.is_archive
   const [restoreTask, setRestoreTask] = useState<Task | null>(null)
   const [copyTask, setCopyTask] = useState<Task | null>(null)
+  // admin/super: toggle between everyone's cards and only my own on this board.
+  const [mineOnly, setMineOnly] = useState(false)
 
   const { data: columns = [], isLoading: colsLoading } = useQuery({
     queryKey: ['columns', boardId],
@@ -183,7 +185,9 @@ export function BoardPage() {
     !q ||
     t.title.toLowerCase().includes(q) ||
     (t.assignee?.full_name.toLowerCase().includes(q) ?? false)
-  const visibleTasks = tasks.filter(matchesSearch)
+  // "我的" scope (admin/super) keeps only cards assigned to the current user.
+  const inScope = (t: Task) => !mineOnly || t.assignee?.id === user?.id
+  const visibleTasks = tasks.filter((t) => inScope(t) && matchesSearch(t))
 
   // Cards within a column always sort by priority (P0 → P1 → P2); same priority
   // keeps its original order (stable). Memoized per column at render time below.
@@ -208,6 +212,17 @@ export function BoardPage() {
           <Button size="small" loading={archiveM.isPending} onClick={() => archiveM.mutate()}>
             立即归档已完成
           </Button>
+        )}
+        {isManager && (
+          <Segmented
+            size="small"
+            value={mineOnly ? 'mine' : 'all'}
+            onChange={(v) => setMineOnly(v === 'mine')}
+            options={[
+              { label: '全部任务', value: 'all' },
+              { label: '只看我的', value: 'mine' },
+            ]}
+          />
         )}
       </div>
 
