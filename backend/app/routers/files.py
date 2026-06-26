@@ -127,9 +127,11 @@ def download_file(
     att = db.get(Attachment, file_id)
     if att is None:
         raise HTTPException(status_code=404, detail="文件不存在")
-    task = _task_for_owner(db, att.owner_type, att.owner_id)
-    if task is None or not _related_to_task(db, user, task):
-        raise HTTPException(status_code=403, detail="无权下载该文件")
+    # Avatars are shown across the app, so any authenticated user may fetch them.
+    if att.owner_type != "avatar":
+        task = _task_for_owner(db, att.owner_type, att.owner_id)
+        if task is None or not _related_to_task(db, user, task):
+            raise HTTPException(status_code=403, detail="无权下载该文件")
     path = Path(att.filepath)
     if not path.exists():
         raise HTTPException(status_code=404, detail="文件已丢失")

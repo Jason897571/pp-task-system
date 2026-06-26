@@ -11,7 +11,7 @@ function makeTask(over: Partial<TaskDetail>): TaskDetail {
     id: 1,
     title: 't',
     description: '',
-    creator: { id: 9, full_name: 'A', role: 'admin', department_id: 1 },
+    creator: { id: 9, full_name: 'A', role: 'admin', department_id: 1, avatar_attachment_id: null, card_color: null },
     assignee: null,
     department_id: 1,
     board_id: 1,
@@ -66,14 +66,14 @@ const admin = { id: 9, role: 'admin' as const }
 
 describe('CardActions rendering', () => {
   it('member sees 开始 in start column as assignee', () => {
-    const task = makeTask({ assignee: { id: 1, full_name: 'M', role: 'member', department_id: 1 } })
+    const task = makeTask({ assignee: { id: 1, full_name: 'M', role: 'member', department_id: 1, avatar_attachment_id: null, card_color: null } })
     const { container } = renderActions(task, 'start', member)
     expect(container.querySelector('[data-action="start"]')).toBeInTheDocument()
     expect(container.querySelector('[data-action="review-approve"]')).not.toBeInTheDocument()
   })
 
   it('member sees no 开始 in start column when not assignee, but can still comment', () => {
-    const task = makeTask({ assignee: { id: 2, full_name: 'O', role: 'member', department_id: 1 } })
+    const task = makeTask({ assignee: { id: 2, full_name: 'O', role: 'member', department_id: 1, avatar_attachment_id: null, card_color: null } })
     const { container } = renderActions(task, 'start', member)
     expect(container.querySelector('[data-action="start"]')).not.toBeInTheDocument()
     expect(container.querySelector('[data-action="comment"]')).toBeInTheDocument()

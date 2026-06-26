@@ -44,6 +44,11 @@ class User(Base):
     )
     role: Mapped[str] = mapped_column(String(20))  # super_admin | admin | member
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Personal settings: a custom avatar (Attachment id, plain int — no FK so the
+    # attachment can be swapped/removed freely) and a card background colour
+    # (#rrggbb / #rrggbbaa) applied to cards this user is assigned to.
+    avatar_attachment_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    card_color: Mapped[str | None] = mapped_column(String(9), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     department: Mapped[Department | None] = relationship()

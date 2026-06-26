@@ -1,5 +1,6 @@
 import type { ColumnKind, Task } from '../api/types'
-import { avatarColor, dueLabel, dueState, initial, PRIORITY_LABEL } from '../lib/badges'
+import { dueLabel, dueState, PRIORITY_LABEL } from '../lib/badges'
+import { UserAvatar } from './UserAvatar'
 
 // Card front (spec §7.3). Layout: colored label pills → title → hairline
 // divider → meta row (status chips on the left, assignee avatar on the right).
@@ -77,13 +78,7 @@ export function CardFront({
           <div className="card-meta">
             <div className="meta-chips">{chips}</div>
             {task.assignee && (
-              <span
-                className="av-sm card-av"
-                style={{ background: avatarColor(task.assignee.id) }}
-                title={task.assignee.full_name}
-              >
-                {initial(task.assignee.full_name)}
-              </span>
+              <UserAvatar user={task.assignee} size={26} className="card-av" />
             )}
           </div>
         </>

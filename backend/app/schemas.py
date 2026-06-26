@@ -12,11 +12,18 @@ class UserOut(BaseModel):
     full_name: str
     role: str
     department_id: int | None
+    avatar_attachment_id: int | None = None
+    card_color: str | None = None
 
 
 class MeOut(UserOut):
     username: str | None
     account_status: str
+
+
+class MeSettingsIn(BaseModel):
+    # The card colour to apply to this user's cards. null/"" clears it.
+    card_color: str | None = None
 
 
 class DepartmentOut(BaseModel):

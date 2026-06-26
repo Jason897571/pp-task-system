@@ -24,14 +24,8 @@ import { CardActions } from './CardActions'
 import { ChecklistsSection } from './ChecklistsSection'
 import { AttachmentsSection, AttachmentList } from './AttachmentsSection'
 import { LinkedTasksSection } from './LinkedTasksSection'
-import {
-  avatarColor,
-  dueLabel,
-  dueState,
-  initial,
-  PRIORITY_LABEL,
-  PRIORITY_OPTIONS,
-} from '../lib/badges'
+import { UserAvatar } from './UserAvatar'
+import { dueLabel, dueState, PRIORITY_LABEL, PRIORITY_OPTIONS } from '../lib/badges'
 import { imagesFromClipboard } from '../lib/clipboard'
 
 interface Props {
@@ -283,12 +277,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
             <div className="cm-chips">
               {task.assignee ? (
                 <span className="cm-chip">
-                  <span
-                    className="av-sm"
-                    style={{ width: 18, height: 18, background: avatarColor(task.assignee.id) }}
-                  >
-                    {initial(task.assignee.full_name)}
-                  </span>
+                  <UserAvatar user={task.assignee} size={18} />
                   {task.assignee.full_name}
                 </span>
               ) : (
@@ -454,9 +443,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                 </div>
                 {task.applications.map((a) => (
                   <div key={a.id} className="cm-appl">
-                    <span className="av-sm" style={{ background: avatarColor(a.applicant.id) }}>
-                      {initial(a.applicant.full_name)}
-                    </span>
+                    <UserAvatar user={a.applicant} size={24} />
                     {a.applicant.full_name}
                   </div>
                 ))}
@@ -478,12 +465,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                     >
                       <div className="cm-glass">
                         <div className="cm-tlhead">
-                          <span
-                            className="av-sm"
-                            style={{ width: 20, height: 20, background: avatarColor(d.submitter.id) }}
-                          >
-                            {initial(d.submitter.full_name)}
-                          </span>
+                          <UserAvatar user={d.submitter} size={20} />
                           <b>{d.submitter.full_name}</b>
                           <span className="tm">{dueLabel(d.created_at)}</span>
                           {last && status && (
@@ -512,12 +494,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                 <div className="cm-comments">
                   {task.comments.map((c) => (
                     <div key={c.id} className="cm-comment">
-                      <span
-                        className="av-sm"
-                        style={{ width: 20, height: 20, background: avatarColor(c.author.id) }}
-                      >
-                        {initial(c.author.full_name)}
-                      </span>
+                      <UserAvatar user={c.author} size={20} />
                       <div className="cm-comment-body">
                         <div className="cm-comment-head">
                           <b>{c.author.full_name}</b>

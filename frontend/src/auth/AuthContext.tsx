@@ -8,6 +8,7 @@ interface AuthState {
   user: MeUser | null
   loading: boolean
   setToken: (token: string) => void
+  refreshMe: () => void
   logout: () => void
 }
 
@@ -47,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, setToken, logout }}>
+    <AuthContext.Provider value={{ user, loading, setToken, refreshMe: loadMe, logout }}>
       {children}
     </AuthContext.Provider>
   )

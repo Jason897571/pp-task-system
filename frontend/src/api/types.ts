@@ -12,6 +12,8 @@ export interface User {
   full_name: string
   role: Role
   department_id: number | null
+  avatar_attachment_id: number | null
+  card_color: string | null
 }
 
 // Returned by /auth/me and /admin/users (extends User)

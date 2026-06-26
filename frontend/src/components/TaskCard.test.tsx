@@ -8,7 +8,7 @@ function makeTask(over: Partial<Task>): Task {
     id: 1,
     title: '写文档',
     description: '',
-    creator: { id: 9, full_name: 'A', role: 'admin', department_id: 1 },
+    creator: { id: 9, full_name: 'A', role: 'admin', department_id: 1, avatar_attachment_id: null, card_color: null },
     assignee: null,
     department_id: 1,
     board_id: 1,

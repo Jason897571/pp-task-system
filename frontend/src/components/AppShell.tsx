@@ -21,7 +21,8 @@ import { useAuth } from '../auth/AuthContext'
 import { createBoard, deleteBoard, getBoards, reorderBoards, updateBoard } from '../api/endpoints'
 import { errMessage } from '../api/client'
 import type { Board } from '../api/types'
-import { avatarColor, initial } from '../lib/badges'
+import { UserAvatar } from './UserAvatar'
+import { SettingsModal } from './SettingsModal'
 import { NotificationBell } from './NotificationBell'
 
 export function AppShell() {
@@ -51,6 +52,7 @@ export function AppShell() {
 
   const [newBoardOpen, setNewBoardOpen] = useState(false)
   const [newBoardName, setNewBoardName] = useState('')
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const createBoardM = useMutation({
     mutationFn: () => createBoard(newBoardName.trim()),
     onSuccess: (board) => {
@@ -170,21 +172,15 @@ export function AppShell() {
         {/* TODO: 创建 button opens a global task-create modal (deferred to per-column add). */}
         <Dropdown
           menu={{
-            items: [{ key: 'logout', label: '退出登录', onClick: logout }],
+            items: [
+              { key: 'settings', label: '个人设置', onClick: () => setSettingsOpen(true) },
+              { key: 'logout', label: '退出登录', onClick: logout },
+            ],
           }}
           placement="bottomRight"
         >
-          <span
-            className="av-sm"
-            style={{
-              background: avatarColor(user?.id ?? 0),
-              width: 28,
-              height: 28,
-              cursor: 'pointer',
-            }}
-            title={user?.full_name}
-          >
-            {initial(user?.full_name ?? '?')}
+          <span style={{ cursor: 'pointer', display: 'inline-flex' }} title={user?.full_name}>
+            <UserAvatar user={user} size={28} />
           </span>
         </Dropdown>
       </div>
@@ -307,6 +303,8 @@ export function AppShell() {
           将自动创建默认列：待办 → 进行中 → 待审核 → 已完成
         </div>
       </Modal>
+
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </>
   )
 }

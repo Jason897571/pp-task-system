@@ -338,6 +338,38 @@ def test_markdown_upload(client, world):
     assert r2.status_code == 200, r2.text
 
 
+def test_personal_settings_and_avatar(client, world):
+    member = auth_header(client, "member", "pw")
+    other = auth_header(client, "member2", "pw")
+
+    # set + clear card colour
+    r = client.put("/api/me/settings", headers=member, json={"card_color": "#ff8800"})
+    assert r.status_code == 200, r.text
+    assert r.json()["card_color"] == "#ff8800"
+    assert client.get("/api/auth/me", headers=member).json()["card_color"] == "#ff8800"
+    cleared = client.put("/api/me/settings", headers=member, json={"card_color": ""})
+    assert cleared.json()["card_color"] is None
+
+    # upload avatar (image) — non-image rejected
+    bad = client.post(
+        "/api/me/avatar",
+        headers=member,
+        files={"file": ("a.txt", io.BytesIO(b"x"), "text/plain")},
+    )
+    assert bad.status_code == 400
+    up = client.post(
+        "/api/me/avatar",
+        headers=member,
+        files={"file": ("me.png", io.BytesIO(b"\x89PNG\r\n\x1a\n"), "image/png")},
+    )
+    assert up.status_code == 200, up.text
+    att_id = up.json()["avatar_attachment_id"]
+    assert att_id is not None
+
+    # avatar is downloadable by ANY authenticated user (shown across the app)
+    assert client.get(f"/api/files/{att_id}", headers=other).status_code == 200
+
+
 def test_deliverable_attachment(client, world):
     admin = auth_header(client, "admin", "pw")
     member = auth_header(client, "member", "pw")

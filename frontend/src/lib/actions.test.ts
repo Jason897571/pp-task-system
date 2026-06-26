@@ -10,7 +10,7 @@ const superAdmin = { id: 99, role: 'super_admin' as const }
 const onBoard = (assigneeId: number | null): ActionContext['task'] => ({
   lifecycle: 'on_board',
   assignee: assigneeId
-    ? { id: assigneeId, full_name: 'X', role: 'member', department_id: 1 }
+    ? { id: assigneeId, full_name: 'X', role: 'member', department_id: 1, avatar_attachment_id: null, card_color: null }
     : null,
 })
 

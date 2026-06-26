@@ -27,11 +27,15 @@ function DraggableCard({
     disabled: !draggable,
   })
 
+  // Assignee's personal card colour (set in 个人设置) tints their cards for everyone.
+  const cardColor = task.assignee?.card_color || undefined
+
   return (
     <div
       ref={setNodeRef}
       className={`card ${isDragging ? 'dragging' : ''} ${col.is_final ? 'card-done' : ''}`}
       data-spine={task.priority === 'high' ? 'high' : undefined}
+      style={cardColor ? { background: cardColor, borderColor: cardColor } : undefined}
       onClick={() => onOpen(task.id)}
       {...(draggable ? { ...listeners, ...attributes } : {})}
     >

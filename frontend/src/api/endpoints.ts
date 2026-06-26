@@ -43,6 +43,16 @@ export const register = (body: RegisterBody) =>
 
 export const getMe = () => api.get<MeUser>('/auth/me').then((r) => r.data)
 
+// --- Personal settings (current user) ---
+export const updateMySettings = (body: { card_color: string | null }) =>
+  api.put<MeUser>('/me/settings', body).then((r) => r.data)
+
+export const uploadAvatar = (file: File) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  return api.post<MeUser>('/me/avatar', fd).then((r) => r.data)
+}
+
 // --- Boards / Columns ---
 export const getBoards = () => api.get<Board[]>('/boards').then((r) => r.data)
 
