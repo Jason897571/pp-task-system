@@ -16,23 +16,25 @@ function loadView(): PoolView {
 // Task Pool — list view + floating-bubble view (spec §6b), choice persisted in localStorage.
 export function PoolPage() {
   const { data: boards = [] } = useQuery({ queryKey: ['boards'], queryFn: getBoards })
-  const [boardId, setBoardId] = useState<number | undefined>()
+  // 'all' (default) aggregates every visible board's pool into one list.
+  const [boardId, setBoardId] = useState<number | 'all'>('all')
   const [openTaskId, setOpenTaskId] = useState<number | null>(null)
   const [view, setView] = useState<PoolView>(loadView)
 
-  const effectiveBoardId = boardId ?? boards[0]?.id
-
   const { data: pool = [], isLoading } = useQuery({
-    queryKey: ['pool', effectiveBoardId],
-    queryFn: () => getPool(effectiveBoardId!),
-    enabled: !!effectiveBoardId,
+    queryKey: ['pool', boardId],
+    queryFn: () => getPool(boardId === 'all' ? undefined : boardId),
   })
 
+  // Columns are only needed to resolve a card's column label; pool tasks have
+  // none, so the aggregated view can skip the fetch entirely.
   const { data: columns = [] } = useQuery({
-    queryKey: ['columns', effectiveBoardId],
-    queryFn: () => getColumns(effectiveBoardId!),
-    enabled: !!effectiveBoardId,
+    queryKey: ['columns', boardId],
+    queryFn: () => getColumns(boardId as number),
+    enabled: boardId !== 'all',
   })
+
+  const boardName = (id: number) => boards.find((b) => b.id === id)?.name ?? '—'
 
   const changeView = (v: PoolView) => {
     setView(v)
@@ -41,6 +43,11 @@ export function PoolPage() {
 
   const columnsDef = [
     { title: '标题', dataIndex: 'title', key: 'title' },
+    {
+      title: '看板',
+      key: 'board',
+      render: (_: unknown, r: Task) => boardName(r.board_id),
+    },
     {
       title: '优先级',
       dataIndex: 'priority',
@@ -68,9 +75,12 @@ export function PoolPage() {
         <Select
           placeholder="选择看板"
           style={{ width: 200 }}
-          value={effectiveBoardId}
+          value={boardId}
           onChange={setBoardId}
-          options={boards.map((b) => ({ value: b.id, label: b.name }))}
+          options={[
+            { value: 'all', label: '全部看板' },
+            ...boards.map((b) => ({ value: b.id, label: b.name })),
+          ]}
         />
         <Segmented
           value={view}

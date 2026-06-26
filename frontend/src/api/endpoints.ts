@@ -155,8 +155,11 @@ export const approveTask = (id: number, body: { approve: boolean; assignee_id?: 
   api.post<Task>(`/tasks/${id}/approve`, body).then((r) => r.data)
 
 // --- Task pool ---
-export const getPool = (boardId: number) =>
-  api.get<Task[]>('/pool', { params: { board_id: boardId } }).then((r) => r.data)
+// Omit boardId to fetch the pool across all visible boards (一次看全部需求池).
+export const getPool = (boardId?: number) =>
+  api
+    .get<Task[]>('/pool', { params: boardId ? { board_id: boardId } : {} })
+    .then((r) => r.data)
 
 export const applyTask = (id: number) =>
   api.post<{ ok: boolean }>(`/tasks/${id}/apply`).then((r) => r.data)
