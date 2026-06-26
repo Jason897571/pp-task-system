@@ -10,7 +10,8 @@ type PoolView = 'list' | 'bubble'
 const VIEW_KEY = 'pool_view'
 
 function loadView(): PoolView {
-  return localStorage.getItem(VIEW_KEY) === 'bubble' ? 'bubble' : 'list'
+  // Default to the bubble view; only an explicit 'list' choice overrides it.
+  return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'bubble'
 }
 
 // Task Pool — list view + floating-bubble view (spec §6b), choice persisted in localStorage.
