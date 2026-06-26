@@ -1,9 +1,85 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
-import { Button, Dropdown, Input, Select } from 'antd'
+import { Button, Dropdown, Input, Modal, Select } from 'antd'
 import type { BoardColumn as Col, Task, User } from '../api/types'
 import { CardFront } from './TaskCard'
 import { canDrag } from '../lib/actions'
+
+// Sentinel for the "加入需求池" choice in the create-card picker (no real user
+// has id 0, so it can never collide with an assignee).
+const POOL = 0
+
+// Managers create cards through this modal: pick an assignee, or choose
+// 加入需求池 to drop the task into the pool (keeps the board, no assignee).
+function AddCardModal({
+  open,
+  assignees,
+  onCancel,
+  onCreate,
+}: {
+  open: boolean
+  assignees: User[]
+  onCancel: () => void
+  onCreate: (title: string, assigneeId: number | null) => void
+}) {
+  const [title, setTitle] = useState('')
+  const [assignee, setAssignee] = useState<number>(POOL)
+
+  // Reset to a clean slate each time the modal is opened.
+  useEffect(() => {
+    if (open) {
+      setTitle('')
+      setAssignee(POOL)
+    }
+  }, [open])
+
+  const submit = () => {
+    const t = title.trim()
+    if (!t) return
+    onCreate(t, assignee === POOL ? null : assignee)
+  }
+
+  return (
+    <Modal
+      title="创建卡片"
+      open={open}
+      onCancel={onCancel}
+      onOk={submit}
+      okText="创建"
+      cancelText="取消"
+      okButtonProps={{ disabled: !title.trim() }}
+      destroyOnClose
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <Input.TextArea
+          autoFocus
+          rows={2}
+          placeholder="卡片标题…"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onPressEnter={(e) => {
+            e.preventDefault()
+            submit()
+          }}
+        />
+        <div>
+          <div style={{ marginBottom: 6, color: 'var(--subtle)', fontSize: 13 }}>指派给</div>
+          <Select
+            showSearch
+            optionFilterProp="label"
+            style={{ width: '100%' }}
+            value={assignee}
+            onChange={setAssignee}
+            options={[
+              { label: '🫧 加入需求池（暂不指派）', value: POOL },
+              ...assignees.map((u) => ({ label: u.full_name, value: u.id })),
+            ]}
+          />
+        </div>
+      </div>
+    </Modal>
+  )
+}
 
 function DraggableCard({
   task,
@@ -104,12 +180,12 @@ export function BoardColumnView({
   const { setNodeRef, isOver } = useDroppable({ id: col.id, data: { col } })
   const [adding, setAdding] = useState(false)
   const [title, setTitle] = useState('')
-  const [assigneeId, setAssigneeId] = useState<number | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState(col.name)
 
-  // Managers (admin/super) pick an assignee at creation; leaving it empty drops
-  // the task into the pool. Members keep the self-submit flow (no picker).
+  // Managers (admin/super) create via the modal (pick assignee or 加入需求池).
+  // Members keep the lightweight inline title box (self-submit -> 待审批).
   const isManager = me.role === 'admin' || me.role === 'super_admin'
   // + 添加卡片 only on start-kind columns (spec §7.2; super_admin included so
   // managers can create-and-assign or seed the pool directly from the board).
@@ -121,9 +197,8 @@ export function BoardColumnView({
       setAdding(false)
       return
     }
-    onAddCard(col.id, t, isManager ? assigneeId : undefined)
+    onAddCard(col.id, t)
     setTitle('')
-    setAssigneeId(null)
     setAdding(false)
   }
 
@@ -208,7 +283,22 @@ export function BoardColumnView({
       </div>
 
       {showAddCard &&
-        (adding ? (
+        (isManager ? (
+          <>
+            <div className="add-card" onClick={() => setModalOpen(true)}>
+              + 添加卡片
+            </div>
+            <AddCardModal
+              open={modalOpen}
+              assignees={assignees}
+              onCancel={() => setModalOpen(false)}
+              onCreate={(t, assigneeId) => {
+                onAddCard(col.id, t, assigneeId)
+                setModalOpen(false)
+              }}
+            />
+          </>
+        ) : adding ? (
           <div style={{ marginTop: 6 }}>
             <Input.TextArea
               autoFocus
@@ -221,30 +311,11 @@ export function BoardColumnView({
                 submitAdd()
               }}
             />
-            {isManager && (
-              <Select
-                size="small"
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                style={{ width: '100%', marginTop: 6 }}
-                placeholder="不指派 → 进需求池"
-                value={assigneeId ?? undefined}
-                onChange={(v) => setAssigneeId(v ?? null)}
-                options={assignees.map((u) => ({ label: u.full_name, value: u.id }))}
-              />
-            )}
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               <Button type="primary" size="small" onClick={submitAdd}>
                 添加卡片
               </Button>
-              <Button
-                size="small"
-                onClick={() => {
-                  setAdding(false)
-                  setAssigneeId(null)
-                }}
-              >
+              <Button size="small" onClick={() => setAdding(false)}>
                 取消
               </Button>
             </div>
