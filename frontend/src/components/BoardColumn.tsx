@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
-import { Button, Dropdown, Input } from 'antd'
+import { Button, Dropdown, Input, Select } from 'antd'
 import type { BoardColumn as Col, Task, User } from '../api/types'
 import { CardFront } from './TaskCard'
 import { canDrag } from '../lib/actions'
@@ -75,8 +75,9 @@ interface Props {
   tasks: Task[]
   me: Pick<User, 'id' | 'role'>
   isSuperAdmin: boolean
+  assignees: User[]
   onOpenCard: (id: number) => void
-  onAddCard: (colId: number, title: string) => void
+  onAddCard: (colId: number, title: string, assigneeId?: number | null) => void
   onRenameColumn: (colId: number, name: string) => void
   onDeleteColumn: (colId: number) => void
   onSetFinal: (colId: number, isFinal: boolean) => void
@@ -90,6 +91,7 @@ export function BoardColumnView({
   tasks,
   me,
   isSuperAdmin,
+  assignees,
   onOpenCard,
   onAddCard,
   onRenameColumn,
@@ -102,11 +104,16 @@ export function BoardColumnView({
   const { setNodeRef, isOver } = useDroppable({ id: col.id, data: { col } })
   const [adding, setAdding] = useState(false)
   const [title, setTitle] = useState('')
+  const [assigneeId, setAssigneeId] = useState<number | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState(col.name)
 
-  // + 添加卡片 only on start-kind columns and not for super_admin (spec §7.2).
-  const showAddCard = col.kind === 'start' && !isSuperAdmin
+  // Managers (admin/super) pick an assignee at creation; leaving it empty drops
+  // the task into the pool. Members keep the self-submit flow (no picker).
+  const isManager = me.role === 'admin' || me.role === 'super_admin'
+  // + 添加卡片 only on start-kind columns (spec §7.2; super_admin included so
+  // managers can create-and-assign or seed the pool directly from the board).
+  const showAddCard = col.kind === 'start'
 
   const submitAdd = () => {
     const t = title.trim()
@@ -114,8 +121,9 @@ export function BoardColumnView({
       setAdding(false)
       return
     }
-    onAddCard(col.id, t)
+    onAddCard(col.id, t, isManager ? assigneeId : undefined)
     setTitle('')
+    setAssigneeId(null)
     setAdding(false)
   }
 
@@ -213,11 +221,30 @@ export function BoardColumnView({
                 submitAdd()
               }}
             />
+            {isManager && (
+              <Select
+                size="small"
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                style={{ width: '100%', marginTop: 6 }}
+                placeholder="不指派 → 进需求池"
+                value={assigneeId ?? undefined}
+                onChange={(v) => setAssigneeId(v ?? null)}
+                options={assignees.map((u) => ({ label: u.full_name, value: u.id }))}
+              />
+            )}
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               <Button type="primary" size="small" onClick={submitAdd}>
                 添加卡片
               </Button>
-              <Button size="small" onClick={() => setAdding(false)}>
+              <Button
+                size="small"
+                onClick={() => {
+                  setAdding(false)
+                  setAssigneeId(null)
+                }}
+              >
                 取消
               </Button>
             </div>

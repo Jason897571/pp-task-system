@@ -14,6 +14,7 @@ import {
   createColumn,
   createTask,
   deleteColumn,
+  getAssignableUsers,
   getBoards,
   getColumns,
   getTasks,
@@ -28,7 +29,7 @@ import { DuplicateModal } from '../components/DuplicateModal'
 import { PRIORITY_RANK } from '../lib/badges'
 import { CardDetailModal } from '../components/CardDetailModal'
 import { canDropInto } from '../lib/actions'
-import type { BoardColumn, Task } from '../api/types'
+import type { BoardColumn, CreateTaskBody, Task } from '../api/types'
 
 export function BoardPage() {
   const { boardId: boardIdParam, taskId: taskIdParam } = useParams()
@@ -70,6 +71,13 @@ export function BoardPage() {
     enabled: !!boardId,
   })
 
+  // Candidates for the "指派给谁" picker on the add-card form (managers only).
+  const { data: assignees = [] } = useQuery({
+    queryKey: ['assignable-users'],
+    queryFn: getAssignableUsers,
+    enabled: isManager,
+  })
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
@@ -94,17 +102,16 @@ export function BoardPage() {
   })
 
   const addCardM = useMutation({
-    mutationFn: ({ colId, title }: { colId: number; title: string }) => {
-      void colId // start column is resolved by backend; assignee handled per role.
-      // admin: assign to self (lands on start). member: self-submit -> pending_approval.
-      const body =
-        user?.role === 'member'
-          ? { title, board_id: boardId! }
-          : { title, board_id: boardId!, assignee_id: user!.id }
+    mutationFn: ({ title, assigneeId }: { title: string; assigneeId?: number | null }) => {
+      // member: self-submit -> pending_approval (no assignee choice).
+      // admin/super: chosen assignee -> on_board; left empty -> open pool (keeps board info).
+      if (user?.role === 'member') return createTask({ title, board_id: boardId! })
+      const body: CreateTaskBody = { title, board_id: boardId! }
+      if (assigneeId != null) body.assignee_id = assigneeId
       return createTask(body)
     },
-    onSuccess: () => {
-      message.success('已添加卡片')
+    onSuccess: (task) => {
+      message.success(task.lifecycle === 'open' ? '已创建到需求池' : '已添加卡片')
       qc.invalidateQueries({ queryKey: ['tasks', boardId, 'on_board'] })
       qc.invalidateQueries({ queryKey: ['pool'] })
     },
@@ -244,8 +251,9 @@ export function BoardPage() {
                 tasks={colTasks(col.id)}
                 me={{ id: user!.id, role: user!.role }}
                 isSuperAdmin={isSuperAdmin}
+                assignees={assignees}
                 onOpenCard={openCard}
-                onAddCard={(colId, title) => addCardM.mutate({ colId, title })}
+                onAddCard={(_colId, title, assigneeId) => addCardM.mutate({ title, assigneeId })}
                 onRenameColumn={(colId, name) => renameColM.mutate({ colId, name })}
                 onDeleteColumn={(colId) => deleteColM.mutate(colId)}
                 onSetFinal={(colId, isFinal) => setFinalM.mutate({ colId, isFinal })}
