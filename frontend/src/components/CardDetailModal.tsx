@@ -154,6 +154,21 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
       .catch((e) => message.error(errMessage(e)))
   }
 
+  // Closing the card (e.g. clicking outside) while a description edit is open
+  // would normally drop the draft — auto-save it instead so nothing is lost.
+  const handleClose = () => {
+    if (editingDesc && task && descDraft !== (task.description ?? '')) {
+      updateM
+        .mutateAsync({ description: descDraft })
+        .then(() => {
+          message.success('已自动保存描述')
+          invalidate()
+        })
+        .catch((e) => message.error(errMessage(e, '描述自动保存失败')))
+    }
+    onClose()
+  }
+
   const saveDue = (due: string | null) => {
     updateM
       .mutateAsync({ due_date: due })
@@ -251,7 +266,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
   )
 
   return (
-    <Modal open width={720} footer={null} onCancel={onClose} title={null} className="cm-modal">
+    <Modal open width={720} footer={null} onCancel={handleClose} title={null} className="cm-modal">
       {isLoading || !task || !user ? (
         <div style={{ display: 'grid', placeItems: 'center', height: 220, background: '#0f1320' }}>
           <Spin />
