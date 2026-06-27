@@ -14,6 +14,7 @@ import {
   reviewTask,
   startTask,
   submitTask,
+  toPoolTask,
   updateTask,
   uploadFile,
 } from '../api/endpoints'
@@ -92,6 +93,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
     mutationFn: (b: { approve: boolean; assignee_id?: number }) => approveTask(taskId, b),
   })
   const assignM = useMutation({ mutationFn: (id: number) => assignTask(taskId, id) })
+  const toPoolM = useMutation({ mutationFn: () => toPoolTask(taskId) })
   const commentM = useMutation({
     mutationFn: async ({ text, files }: { text: string; files: File[] }) => {
       const c = await commentTask(taskId, text)
@@ -118,7 +120,8 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
     applyM.isPending ||
     reviewM.isPending ||
     approveM.isPending ||
-    assignM.isPending
+    assignM.isPending ||
+    toPoolM.isPending
 
   // Inline description editing (admin/super) + inline 产出 composer state.
   const [editingDesc, setEditingDesc] = useState(false)
@@ -254,6 +257,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
         )
       }
       onAssign={(id) => wrap(() => assignM.mutateAsync(id), '已指派')}
+      onToPool={isManager ? () => wrap(() => toPoolM.mutateAsync(), '已放入需求池') : undefined}
       onComment={(text, files) => wrap(() => commentM.mutateAsync({ text, files }), '评论已发送')}
       onDelete={isManager ? () => deleteM.mutate() : undefined}
     />

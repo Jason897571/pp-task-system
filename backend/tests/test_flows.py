@@ -635,6 +635,54 @@ def test_member_cannot_assign(client, world):
 
 
 # --------------------------------------------------------------------------
+# Send an on-board task back to the pool (reverse of assign)
+# --------------------------------------------------------------------------
+
+
+def test_to_pool_returns_on_board_task(client, world):
+    admin = auth_header(client, "admin", "pw")
+    member = auth_header(client, "member", "pw")
+    t = client.post(
+        "/api/tasks",
+        headers=admin,
+        json={"title": "回池", "board_id": world["board"].id, "assignee_id": world["member"].id},
+    ).json()
+    assert t["lifecycle"] == "on_board"
+
+    r = client.post(f"/api/tasks/{t['id']}/to-pool", headers=admin)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["lifecycle"] == "open"
+    assert body["assignee"] is None
+    assert body["column_id"] is None
+    assert body["board_id"] == world["board"].id  # board kept
+
+    # reappears in the pool
+    pool = client.get("/api/pool", headers=member).json()
+    assert any(p["id"] == t["id"] for p in pool)
+
+
+def test_to_pool_rejects_non_on_board(client, world):
+    admin = auth_header(client, "admin", "pw")
+    t = client.post("/api/tasks", headers=admin, json={"title": "已在池", "board_id": world["board"].id}).json()
+    assert t["lifecycle"] == "open"
+    r = client.post(f"/api/tasks/{t['id']}/to-pool", headers=admin)
+    assert r.status_code == 409
+
+
+def test_member_cannot_to_pool(client, world):
+    admin = auth_header(client, "admin", "pw")
+    member = auth_header(client, "member", "pw")
+    t = client.post(
+        "/api/tasks",
+        headers=admin,
+        json={"title": "x", "board_id": world["board"].id, "assignee_id": world["member"].id},
+    ).json()
+    r = client.post(f"/api/tasks/{t['id']}/to-pool", headers=member)
+    assert r.status_code == 403
+
+
+# --------------------------------------------------------------------------
 # Task list visibility scoping
 # --------------------------------------------------------------------------
 

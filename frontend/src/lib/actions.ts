@@ -10,6 +10,7 @@ export type ActionKey =
   | 'approve' // admin: pending_approval
   | 'assign_pool' // admin: open (pool) — 分派
   | 'assign_board' // admin: any on-board card — 指派/转派
+  | 'to_pool' // admin/super: on-board card → 放回需求池
 
 export interface ActionContext {
   task: Pick<Task, 'lifecycle' | 'assignee'>
@@ -40,11 +41,14 @@ export function visibleActions({ task, columnKind, requiresReview, me }: ActionC
     if (task.lifecycle === 'on_board') {
       if (requiresReview) actions.push('review')
       actions.push('assign_board') // 指派/转派 on any on-board card
+      actions.push('to_pool') // 放回需求池
     }
     return actions
   }
 
-  // super_admin: no card-flow action buttons (workflow editing lives in column headers).
+  // super_admin: workflow editing lives in column headers; the one card-flow
+  // action is sending an on-board task back to the pool.
+  if (task.lifecycle === 'on_board') actions.push('to_pool')
   return actions
 }
 

@@ -241,6 +241,40 @@ def assign_task(
     return serialize_task(db, task)
 
 
+@router.post("/tasks/{task_id}/to-pool", response_model=TaskOut)
+def task_to_pool(
+    task_id: int,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Send an on-board task back to the pool: clear assignee + column, keep the
+    board, flip lifecycle to open so anyone can pick it up again."""
+    task = db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not admin_can_touch_task(user, task):
+        raise HTTPException(status_code=403, detail="无权操作该任务")
+    if task.lifecycle != "on_board":
+        raise HTTPException(status_code=409, detail="只有看板上的任务可以放入需求池")
+
+    former_assignee_id = task.assignee_id
+    task.lifecycle = "open"
+    task.assignee_id = None
+    task.column_id = None
+    log_activity(db, task, user, "to_pool")
+    if former_assignee_id is not None:
+        notify(
+            db,
+            former_assignee_id,
+            "to_pool",
+            f"任务「{task.title}」已被放回需求池",
+            task.id,
+        )
+    db.commit()
+    db.refresh(task)
+    return serialize_task(db, task)
+
+
 @router.post("/tasks/{task_id}/approve", response_model=TaskOut)
 def approve_task(
     task_id: int,

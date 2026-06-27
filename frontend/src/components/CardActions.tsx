@@ -19,6 +19,7 @@ interface Props {
   onReview: (approve: boolean, comment?: string) => void
   onApprove: (approve: boolean, assigneeId?: number) => void
   onAssign: (assigneeId: number) => void
+  onToPool?: () => void
   onComment: (text: string, files: File[]) => void
   onDelete?: () => void
 }
@@ -36,7 +37,8 @@ export function CardActions(props: Props) {
   const hasReview = actions.includes('review')
   const hasApprove = actions.includes('approve')
   const hasAssign = actions.includes('assign_pool') || actions.includes('assign_board')
-  const hasToolbar = hasReview || hasApprove || hasAssign || !!onDelete
+  const hasToPool = actions.includes('to_pool')
+  const hasToolbar = hasReview || hasApprove || hasAssign || hasToPool || !!onDelete
 
   // The sole action of a context opens expanded; review's primary keys stay inline.
   const initialPane: Pane = hasApprove ? 'approve' : hasAssign && !hasReview ? 'assign' : null
@@ -158,14 +160,15 @@ export function CardActions(props: Props) {
               ↩ 打回
             </button>
             <span className="tdiv" />
-            <button
-              className={`tbtn ${pane === 'comment' ? 'active' : ''}`}
-              onClick={() => toggle('comment')}
-            >
-              💬 评论
-            </button>
           </>
         )}
+
+        <button
+          className={`tbtn ${pane === 'comment' ? 'active' : ''}`}
+          onClick={() => toggle('comment')}
+        >
+          💬 评论
+        </button>
 
         {hasApprove && (
           <button
@@ -183,6 +186,20 @@ export function CardActions(props: Props) {
           >
             👤 {actions.includes('assign_pool') ? '分派' : '指派 / 转派'}
           </button>
+        )}
+
+        {hasToPool && props.onToPool && (
+          <Popconfirm
+            title="放入需求池？"
+            description="将清除负责人并放回需求池，等待重新领取。"
+            okText="放入"
+            cancelText="取消"
+            onConfirm={props.onToPool}
+          >
+            <button data-action="to-pool" className="tbtn" disabled={busy}>
+              🫧 放入需求池
+            </button>
+          </Popconfirm>
         )}
 
         {onDelete && (

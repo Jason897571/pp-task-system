@@ -63,11 +63,12 @@ describe('PoolPage view toggle persistence', () => {
     // Wait for the pool to load (toggle is rendered alongside).
     await waitFor(() => expect(screen.getByText('气泡')).toBeInTheDocument())
 
-    await user.click(screen.getByText('气泡'))
-    expect(localStorage.getItem(VIEW_KEY)).toBe('bubble')
-
+    // Default is bubble, so switching to list is the first state-changing toggle.
     await user.click(screen.getByText('列表'))
     expect(localStorage.getItem(VIEW_KEY)).toBe('list')
+
+    await user.click(screen.getByText('气泡'))
+    expect(localStorage.getItem(VIEW_KEY)).toBe('bubble')
   })
 
   it('initializes from localStorage on mount (bubble view → renders bubble field)', async () => {

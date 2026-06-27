@@ -151,6 +151,10 @@ export const unlinkTask = (id: number, linked_id: number) =>
 export const assignTask = (id: number, assignee_id: number) =>
   api.post<Task>(`/tasks/${id}/assign`, { assignee_id }).then((r) => r.data)
 
+// Send an on-board task back to the pool (clears assignee, keeps the board).
+export const toPoolTask = (id: number) =>
+  api.post<Task>(`/tasks/${id}/to-pool`).then((r) => r.data)
+
 export const approveTask = (id: number, body: { approve: boolean; assignee_id?: number }) =>
   api.post<Task>(`/tasks/${id}/approve`, body).then((r) => r.data)
 

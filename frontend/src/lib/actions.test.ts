@@ -77,8 +77,10 @@ describe('visibleActions — admin', () => {
 })
 
 describe('visibleActions — super_admin', () => {
-  it('has no card-flow action buttons', () => {
-    expect(visibleActions({ task: onBoard(1), columnKind: 'review', me: superAdmin })).toEqual([])
+  it('can send an on-board card back to the pool, nothing else', () => {
+    expect(visibleActions({ task: onBoard(1), columnKind: 'review', me: superAdmin })).toEqual([
+      'to_pool',
+    ])
   })
 })
 
