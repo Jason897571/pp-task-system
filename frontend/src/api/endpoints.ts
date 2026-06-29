@@ -276,3 +276,9 @@ export const getMemberStats = () =>
 // completed-last-week task lists as a JSON object the client saves to a file.
 export const exportWeekly = () =>
   api.get<WeeklyExport>('/export/weekly').then((r) => r.data)
+
+// Sync every site task into the Feishu bitable (super_admin).
+export const syncFeishu = () =>
+  api
+    .post<{ total: number; created: number; updated: number }>('/sync/feishu')
+    .then((r) => r.data)

@@ -7,6 +7,7 @@ import {
   getMemberStats,
   getStatsOverview,
   getTasks,
+  syncFeishu,
 } from '../api/endpoints'
 import { errMessage } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
@@ -91,7 +92,20 @@ export function StatsPage() {
   const [boardId, setBoardId] = useState<number | undefined>()
   const [memberTask, setMemberTask] = useState<MemberStats | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const effectiveBoardId = boardId ?? boards[0]?.id
+
+  const onSyncFeishu = async () => {
+    setSyncing(true)
+    try {
+      const r = await syncFeishu()
+      message.success(`已同步到飞书：共 ${r.total} 条（新增 ${r.created} · 更新 ${r.updated}）`)
+    } catch (e) {
+      message.error(errMessage(e, '飞书同步失败'))
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const onExport = async () => {
     setExporting(true)
@@ -138,9 +152,14 @@ export function StatsPage() {
         />
         <span style={{ flex: 1 }} />
         {user?.role === 'super_admin' && (
-          <Button loading={exporting} onClick={onExport}>
-            ⬇ 导出本周报表（JSON）
-          </Button>
+          <>
+            <Button loading={syncing} onClick={onSyncFeishu}>
+              🔄 同步到飞书多维表格
+            </Button>
+            <Button loading={exporting} onClick={onExport}>
+              ⬇ 导出本周报表（JSON）
+            </Button>
+          </>
         )}
       </div>
 

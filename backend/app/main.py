@@ -10,6 +10,7 @@ from app.routers import (
     boards,
     checklists,
     export,
+    feishu_sync,
     files,
     notifications,
     pool,
@@ -52,6 +53,7 @@ app.include_router(files.router)
 app.include_router(notifications.router)
 app.include_router(stats.router)
 app.include_router(export.router)
+app.include_router(feishu_sync.router)
 
 
 @app.get("/health")
