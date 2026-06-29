@@ -111,8 +111,15 @@ export function BoardPage() {
       return createTask(body)
     },
     onSuccess: (task) => {
-      message.success(task.lifecycle === 'open' ? '已创建到需求池' : '已添加卡片')
+      message.success(
+        task.lifecycle === 'open'
+          ? '已创建到需求池'
+          : task.lifecycle === 'pending_approval'
+            ? '已提交，等待管理员审批'
+            : '已添加卡片',
+      )
       qc.invalidateQueries({ queryKey: ['tasks', boardId, 'on_board'] })
+      qc.invalidateQueries({ queryKey: ['tasks', 'pending_approval'] })
       qc.invalidateQueries({ queryKey: ['pool'] })
     },
     onError: (e) => message.error(errMessage(e)),

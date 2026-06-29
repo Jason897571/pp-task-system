@@ -46,8 +46,9 @@ export function visibleActions({ task, columnKind, requiresReview, me }: ActionC
     return actions
   }
 
-  // super_admin: workflow editing lives in column headers; the one card-flow
-  // action is sending an on-board task back to the pool.
+  // super_admin: workflow editing lives in column headers. Card-flow actions are
+  // approving a member's submission and sending an on-board task back to the pool.
+  if (task.lifecycle === 'pending_approval') actions.push('approve')
   if (task.lifecycle === 'on_board') actions.push('to_pool')
   return actions
 }

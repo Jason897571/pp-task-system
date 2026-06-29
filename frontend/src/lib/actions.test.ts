@@ -77,10 +77,14 @@ describe('visibleActions — admin', () => {
 })
 
 describe('visibleActions — super_admin', () => {
-  it('can send an on-board card back to the pool, nothing else', () => {
+  it('can send an on-board card back to the pool', () => {
     expect(visibleActions({ task: onBoard(1), columnKind: 'review', me: superAdmin })).toEqual([
       'to_pool',
     ])
+  })
+  it('can approve a member submission', () => {
+    const pending: ActionContext['task'] = { lifecycle: 'pending_approval', assignee: null }
+    expect(visibleActions({ task: pending, columnKind: null, me: superAdmin })).toEqual(['approve'])
   })
 })
 

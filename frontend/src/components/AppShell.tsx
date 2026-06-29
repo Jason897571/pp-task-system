@@ -18,7 +18,14 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useAuth } from '../auth/AuthContext'
-import { createBoard, deleteBoard, getBoards, reorderBoards, updateBoard } from '../api/endpoints'
+import {
+  createBoard,
+  deleteBoard,
+  getBoards,
+  getTasks,
+  reorderBoards,
+  updateBoard,
+} from '../api/endpoints'
 import { errMessage } from '../api/client'
 import type { Board } from '../api/types'
 import { UserAvatar } from './UserAvatar'
@@ -34,6 +41,12 @@ export function AppShell() {
   const { message } = AntApp.useApp()
 
   const { data: boards = [] } = useQuery({ queryKey: ['boards'], queryFn: getBoards })
+
+  // Pending-approval count for the sidebar badge (scoped per role by the backend).
+  const { data: pendingTasks = [] } = useQuery({
+    queryKey: ['tasks', 'pending_approval'],
+    queryFn: () => getTasks({ lifecycle: 'pending_approval' }),
+  })
 
   // Search: local state drives the input (so IME composition isn't interrupted by
   // a value reset); the query is pushed to ?q= only when not mid-composition.
@@ -132,6 +145,7 @@ export function AppShell() {
   })()
 
   const isPool = location.pathname.startsWith('/pool')
+  const isApprovals = location.pathname.startsWith('/approvals')
   const isAdmin = location.pathname.startsWith('/admin')
   const isRecurring = location.pathname.startsWith('/recurring')
   const isStats = location.pathname.startsWith('/stats')
@@ -250,6 +264,12 @@ export function AppShell() {
             onClick={() => navigate('/pool')}
           >
             🫧 任务池
+          </button>
+          <button
+            className={`nav-item ${isApprovals ? 'active' : ''}`}
+            onClick={() => navigate('/approvals')}
+          >
+            📥 待审批{pendingTasks.length > 0 ? ` (${pendingTasks.length})` : ''}
           </button>
           {isManager && (
             <>

@@ -6,6 +6,7 @@ import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { BoardPage } from './pages/BoardPage'
 import { PoolPage } from './pages/PoolPage'
+import { ApprovalPage } from './pages/ApprovalPage'
 import { AdminPage } from './pages/AdminPage'
 import { RecurringPage } from './pages/RecurringPage'
 import { StatsPage } from './pages/StatsPage'
@@ -61,6 +62,7 @@ export function AppRoutes() {
         <Route path="/board/:boardId" element={<BoardPage />} />
         <Route path="/board/:boardId/card/:taskId" element={<BoardPage />} />
         <Route path="/pool" element={<PoolPage />} />
+        <Route path="/approvals" element={<ApprovalPage />} />
         <Route
           path="/recurring"
           element={
