@@ -218,6 +218,8 @@ class AdminUserIn(BaseModel):
     full_name: str
     department_id: int | None = None
     role: str  # admin | member (super_admin allowed too)
+    email: str | None = None
+    phone: str | None = None
 
 
 class AdminUserOut(BaseModel):
@@ -241,12 +243,17 @@ class AdminUserListOut(BaseModel):
     account_status: str
     username: str | None
     invite_code: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    feishu_open_id: str | None = None
 
 
 class AdminUserUpdateIn(BaseModel):
     role: str | None = None
     department_id: int | None = None
     is_active: bool | None = None
+    email: str | None = None
+    phone: str | None = None
 
 
 class BoardIn(BaseModel):

@@ -20,6 +20,7 @@ import {
   getAdminUsers,
   getDepartments,
   getVisibilityMatrix,
+  resolveFeishu,
   setBoardMemberVisibility,
   updateUser,
 } from '../api/endpoints'
@@ -77,6 +78,10 @@ function UsersTab() {
   const [createOpen, setCreateOpen] = useState(false)
   const [created, setCreated] = useState<CreatedUser | null>(null)
   const [form] = Form.useForm<CreateUserBody>()
+  // Edit modal (email/phone — the Feishu @-mention identity).
+  const [editUser, setEditUser] = useState<AdminUser | null>(null)
+  const [editEmail, setEditEmail] = useState('')
+  const [editPhone, setEditPhone] = useState('')
 
   const createM = useMutation({
     mutationFn: (body: CreateUserBody) => createUser(body),
@@ -96,14 +101,53 @@ function UsersTab() {
     onError: (e) => message.error(errMessage(e)),
   })
 
+  const editM = useMutation({
+    mutationFn: ({ id, email, phone }: { id: number; email: string; phone: string }) =>
+      updateUser(id, { email, phone }),
+    onSuccess: (u) => {
+      message.success(
+        u.feishu_open_id
+          ? '已保存，飞书 @ 已绑定'
+          : '已保存（未解析到飞书 open_id，@ 将回退为文本名）',
+      )
+      setEditUser(null)
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
+
+  const resolveM = useMutation({
+    mutationFn: resolveFeishu,
+    onSuccess: (r) => {
+      message.success(`飞书解析完成：成功 ${r.resolved} / 失败 ${r.failed}（共 ${r.total}）`)
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
+
+  const openEdit = (u: AdminUser) => {
+    setEditEmail(u.email ?? '')
+    setEditPhone(u.phone ?? '')
+    setEditUser(u)
+  }
+
   const deptName = (id: number | null) =>
     departments.find((d) => d.id === id)?.name ?? '—'
 
   return (
     <div>
-      <Button type="primary" style={{ marginBottom: 16 }} onClick={() => setCreateOpen(true)}>
-        + 预置用户
-      </Button>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <Button type="primary" onClick={() => setCreateOpen(true)}>
+          + 预置用户
+        </Button>
+        <Button
+          loading={resolveM.isPending}
+          onClick={() => resolveM.mutate()}
+          title="用各用户的邮箱/手机解析飞书 open_id（需先给应用开通通讯录权限）"
+        >
+          🔗 解析飞书 @
+        </Button>
+      </div>
       <Table
         rowKey="id"
         pagination={false}
@@ -157,6 +201,29 @@ function UsersTab() {
               />
             ),
           },
+          {
+            title: '飞书@',
+            key: 'feishu',
+            render: (_: unknown, r: AdminUser) =>
+              r.feishu_open_id ? (
+                <span style={{ color: '#52c41a' }} title="已绑定 open_id，可真·@">
+                  ✓ 已绑定
+                </span>
+              ) : (
+                <span style={{ color: 'var(--subtle)' }} title="未绑定，@ 回退为文本名">
+                  —
+                </span>
+              ),
+          },
+          {
+            title: '操作',
+            key: 'edit',
+            render: (_: unknown, r: AdminUser) => (
+              <Button size="small" onClick={() => openEdit(r)}>
+                编辑
+              </Button>
+            ),
+          },
         ]}
       />
 
@@ -183,7 +250,45 @@ function UsersTab() {
               ]}
             />
           </Form.Item>
+          <Form.Item name="email" label="飞书邮箱（用于 @ 通知）">
+            <Input placeholder="可选，飞书绑定的邮箱" />
+          </Form.Item>
+          <Form.Item name="phone" label="飞书手机号（用于 @ 通知）">
+            <Input placeholder="可选，飞书绑定的手机号" />
+          </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title={editUser ? `编辑「${editUser.full_name}」的飞书身份` : ''}
+        open={!!editUser}
+        okText="保存"
+        confirmLoading={editM.isPending}
+        onCancel={() => setEditUser(null)}
+        onOk={() =>
+          editUser && editM.mutate({ id: editUser.id, email: editEmail, phone: editPhone })
+        }
+      >
+        <Typography.Paragraph type="secondary" style={{ fontSize: 13 }}>
+          填飞书绑定的邮箱或手机号,保存后系统会自动解析 open_id 用于群里真·@。
+          解析需应用已开通通讯录权限;解析不到时 @ 会回退为文本名。
+        </Typography.Paragraph>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 6, color: 'var(--subtle)', fontSize: 13 }}>飞书邮箱</div>
+          <Input
+            value={editEmail}
+            onChange={(e) => setEditEmail(e.target.value)}
+            placeholder="飞书绑定的邮箱"
+          />
+        </div>
+        <div>
+          <div style={{ marginBottom: 6, color: 'var(--subtle)', fontSize: 13 }}>飞书手机号</div>
+          <Input
+            value={editPhone}
+            onChange={(e) => setEditPhone(e.target.value)}
+            placeholder="飞书绑定的手机号"
+          />
+        </div>
       </Modal>
 
       <Modal

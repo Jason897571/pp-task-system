@@ -26,6 +26,9 @@ export interface AdminUser extends User {
   account_status: AccountStatus
   username: string | null
   invite_code: string | null
+  email: string | null
+  phone: string | null
+  feishu_open_id: string | null
 }
 
 // Returned by POST /admin/users — includes the one-time invite code.
@@ -298,10 +301,14 @@ export interface CreateUserBody {
   full_name: string
   department_id: number
   role: Role
+  email?: string
+  phone?: string
 }
 
 export interface UpdateUserBody {
   role?: Role
   department_id?: number
   is_active?: boolean
+  email?: string
+  phone?: string
 }

@@ -23,6 +23,11 @@ class Settings:
     )
     feishu_wiki_node: str = os.getenv("FEISHU_WIKI_NODE", "LY8TwYpKXitji9ktIHLchVtQnXf")
     feishu_table_id: str = os.getenv("FEISHU_TABLE_ID", "tbloCw7dhGA7MKTB")
+    # Group custom-bot webhook for task notifications (@-by-name in text).
+    feishu_bot_webhook: str = os.getenv(
+        "FEISHU_BOT_WEBHOOK",
+        "https://open.feishu.cn/open-apis/bot/v2/hook/93d692de-8aa3-4023-bfef-5cd166dbfdb3",
+    )
 
 
 settings = Settings()

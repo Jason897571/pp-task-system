@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user, require_admin
+from app.feishu import post_bot_webhook
 from app.models import (
     Board,
     BoardColumn,
@@ -50,6 +52,25 @@ from app.services import (
 )
 
 router = APIRouter(prefix="/api", tags=["tasks"])
+
+
+def _feishu(text: str) -> None:
+    """Post a task notification to the group bot (best-effort, non-blocking)."""
+    post_bot_webhook(settings.feishu_bot_webhook, text)
+
+
+def _name(user: User | None) -> str:
+    return user.full_name if user else "某人"
+
+
+def _at(user: User | None) -> str:
+    """Feishu @-fragment: a real <at> when we have the user's open_id, else the
+    plain-text @name fallback (visible in the group but not a hard ping)."""
+    if user is None:
+        return "@某人"
+    if user.feishu_open_id:
+        return f'<at user_id="{user.feishu_open_id}">{user.full_name}</at>'
+    return f"@{user.full_name}"
 
 
 def _column_kind(db: Session, task: Task) -> str | None:
@@ -159,6 +180,11 @@ def create_task(
         db.add(task)
     db.commit()
     db.refresh(task)
+    if task.lifecycle == "on_board" and task.assignee is not None:
+        _feishu(
+            f"📌 {_at(task.assignee)}，你被指派了新任务「{task.title}」"
+            f"（指派人：{_name(user)}）"
+        )
     return serialize_task(db, task)
 
 
@@ -238,6 +264,11 @@ def assign_task(
     notify(db, assignee.id, "assigned", f"你被指派了任务「{task.title}」", task.id)
     db.commit()
     db.refresh(task)
+    verb = "转派给" if is_reassign else "指派给"
+    _feishu(
+        f"📌 {_at(assignee)}，任务「{task.title}」已{verb}你"
+        f"（操作人：{_name(user)}）"
+    )
     return serialize_task(db, task)
 
 
@@ -315,6 +346,10 @@ def approve_task(
     notify(db, assignee.id, "assigned", f"你被指派了任务「{task.title}」", task.id)
     db.commit()
     db.refresh(task)
+    _feishu(
+        f"📌 {_at(assignee)}，任务「{task.title}」已通过审批并指派给你"
+        f"（审批人：{_name(user)}）"
+    )
     return serialize_task(db, task)
 
 
@@ -439,6 +474,11 @@ def submit_task(
         log_activity(db, task, user, "submitted", comment=body.note)
     db.commit()
     db.refresh(task)
+    if review is not None:
+        _feishu(
+            f"🔍 {_at(task.creator)}，任务「{task.title}」已提交完成，需要你 review"
+            f"（提交人：{_name(user)}）"
+        )
     return serialize_task(db, task)
 
 
@@ -506,8 +546,14 @@ def comment_task(
     # Notify the people involved (assignee + creator), minus the commenter.
     for uid in {task.assignee_id, task.creator_id} - {None, user.id}:
         notify(db, uid, "comment", f"任务「{task.title}」收到评论：{text}", task.id)
+    assignee = task.assignee  # the person doing the task — @-ed on Feishu
     db.commit()
     db.refresh(act)
+    if assignee is not None and assignee.id != user.id:
+        snippet = text if len(text) <= 100 else text[:100] + "…"
+        _feishu(
+            f"💬 {_at(assignee)}，任务「{task.title}」收到来自 {_name(user)} 的评论：{snippet}"
+        )
     return CommentOut(
         id=act.id,
         author=UserOut.model_validate(user),
@@ -613,6 +659,9 @@ def duplicate_task(
     notify(db, assignee.id, "assigned", f"你被指派了任务「{dst.title}」", dst.id)
     db.commit()
     db.refresh(dst)
+    _feishu(
+        f"📌 {_at(assignee)}，你被指派了新任务「{dst.title}」（指派人：{_name(user)}）"
+    )
     return serialize_task(db, dst)
 
 

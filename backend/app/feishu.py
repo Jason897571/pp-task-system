@@ -6,10 +6,34 @@ used (no extra deps); the app must be a collaborator on the target wiki doc with
 bitable + wiki permissions.
 """
 import json
+import threading
 import urllib.error
 import urllib.request
 
 FEISHU_BASE = "https://open.feishu.cn/open-apis"
+
+
+def post_bot_webhook(webhook_url: str, text: str) -> None:
+    """Fire-and-forget a text message to a Feishu custom-bot webhook.
+
+    Runs in a daemon thread so a slow/unreachable webhook never blocks the API
+    request, and swallows all errors (a notification failure must not break the
+    underlying task action).
+    """
+    if not webhook_url or not text:
+        return
+
+    def _send():
+        try:
+            body = json.dumps({"msg_type": "text", "content": {"text": text}}).encode()
+            req = urllib.request.Request(
+                webhook_url, data=body, headers={"Content-Type": "application/json"}, method="POST"
+            )
+            urllib.request.urlopen(req, timeout=8)
+        except Exception:
+            pass
+
+    threading.Thread(target=_send, daemon=True).start()
 
 # Field types we use (Feishu bitable field type ids).
 FT_TEXT = 1
@@ -57,6 +81,26 @@ class FeishuClient:
         if full.get("code") != 0:
             raise FeishuError(f"获取飞书 token 失败: {full.get('msg')}")
         return full["tenant_access_token"]
+
+    # ---- contact ---------------------------------------------------------
+    def resolve_open_id(self, mobile: str | None = None, email: str | None = None) -> str | None:
+        """Look up a user's open_id by mobile or email (needs contact:user.id:
+        readonly). Returns None if not found. Raises FeishuError on API failure
+        (e.g. the permission is not granted)."""
+        body: dict = {}
+        if mobile:
+            body["mobiles"] = [mobile]
+        if email:
+            body["emails"] = [email]
+        if not body:
+            return None
+        data = self._request(
+            "POST", "/contact/v3/users/batch_get_id?user_id_type=open_id", body
+        )
+        for item in data.get("user_list", []):
+            if item.get("user_id"):
+                return item["user_id"]
+        return None
 
     # ---- bitable ---------------------------------------------------------
     def resolve_wiki_app_token(self, node_token: str) -> str:

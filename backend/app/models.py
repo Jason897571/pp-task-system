@@ -37,6 +37,9 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Feishu open_id (resolved from email/phone) — used to @-mention in group bot.
+    feishu_open_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     invite_code: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True)
     account_status: Mapped[str] = mapped_column(String(20), default="invited")  # invited | active
     department_id: Mapped[int | None] = mapped_column(

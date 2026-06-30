@@ -189,6 +189,12 @@ export const createUser = (body: CreateUserBody) =>
 export const updateUser = (id: number, body: UpdateUserBody) =>
   api.put<AdminUser>(`/admin/users/${id}`, body).then((r) => r.data)
 
+// Bulk-resolve every user's Feishu open_id from their email/phone.
+export const resolveFeishu = () =>
+  api
+    .post<{ total: number; resolved: number; failed: number }>('/admin/users/resolve-feishu')
+    .then((r) => r.data)
+
 // --- Tags ---
 export const getTags = () => api.get<Tag[]>('/tags').then((r) => r.data)
 

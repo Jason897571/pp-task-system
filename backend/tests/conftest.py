@@ -7,6 +7,9 @@ from app.config import settings
 from app.database import Base, get_db
 from app.main import app
 
+# Never hit the real Feishu group webhook from the test suite.
+settings.feishu_bot_webhook = ""
+
 # Use the MySQL test database (task_system_test). Tables are created/dropped
 # per session.
 test_engine = create_engine(settings.test_database_url, pool_pre_ping=True, future=True)
