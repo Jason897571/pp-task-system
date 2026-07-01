@@ -1070,3 +1070,34 @@ def test_reassign_keeps_task_visible(client, world):
     member = auth_header(client, "member", "pw")
     mids = {x["id"] for x in client.get("/api/tasks", headers=member).json()}
     assert t["id"] in mids
+
+
+# --------------------------------------------------------------------------
+# Regression: a super_admin (no department) must not create a department-less
+# pool task — it would be invisible in every department-scoped pool.
+# --------------------------------------------------------------------------
+
+
+def test_super_pool_task_requires_department(client, world):
+    sup = auth_header(client, "super", "pw")
+    # No assignee + no department -> would be an orphan pool task -> rejected.
+    r = client.post(
+        "/api/tasks",
+        headers=sup,
+        json={"title": "无部门池任务", "board_id": world["board"].id},
+    )
+    assert r.status_code == 400, r.text
+
+    # With an explicit department it lands in that department's pool.
+    r2 = client.post(
+        "/api/tasks",
+        headers=sup,
+        json={
+            "title": "有部门池任务",
+            "board_id": world["board"].id,
+            "department_id": world["rnd"].id,
+        },
+    )
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["lifecycle"] == "open"
+    assert r2.json()["department_id"] == world["rnd"].id

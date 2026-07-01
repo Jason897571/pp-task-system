@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { Button, Dropdown, Input, Modal, Select } from 'antd'
-import type { BoardColumn as Col, Task, User } from '../api/types'
+import type { BoardColumn as Col, Department, Task, User } from '../api/types'
 import { CardFront } from './TaskCard'
 import { canDrag } from '../lib/actions'
 
@@ -14,29 +14,39 @@ const POOL = 0
 function AddCardModal({
   open,
   assignees,
+  departments,
+  isSuperAdmin,
   onCancel,
   onCreate,
 }: {
   open: boolean
   assignees: User[]
+  departments: Department[]
+  isSuperAdmin: boolean
   onCancel: () => void
-  onCreate: (title: string, assigneeId: number | null) => void
+  onCreate: (title: string, assigneeId: number | null, departmentId: number | null) => void
 }) {
   const [title, setTitle] = useState('')
   const [assignee, setAssignee] = useState<number>(POOL)
+  const [departmentId, setDepartmentId] = useState<number | null>(null)
 
   // Reset to a clean slate each time the modal is opened.
   useEffect(() => {
     if (open) {
       setTitle('')
       setAssignee(POOL)
+      setDepartmentId(null)
     }
   }, [open])
 
+  // super_admin has no department of their own, so when they drop a task into
+  // the (department-scoped) pool they must pick which department's pool it joins.
+  const needDept = isSuperAdmin && assignee === POOL
+  const blocked = !title.trim() || (needDept && departmentId == null)
+
   const submit = () => {
-    const t = title.trim()
-    if (!t) return
-    onCreate(t, assignee === POOL ? null : assignee)
+    if (blocked) return
+    onCreate(title.trim(), assignee === POOL ? null : assignee, departmentId)
   }
 
   return (
@@ -47,7 +57,7 @@ function AddCardModal({
       onOk={submit}
       okText="创建"
       cancelText="取消"
-      okButtonProps={{ disabled: !title.trim() }}
+      okButtonProps={{ disabled: blocked }}
       destroyOnClose
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -76,6 +86,20 @@ function AddCardModal({
             ]}
           />
         </div>
+        {needDept && (
+          <div>
+            <div style={{ marginBottom: 6, color: 'var(--subtle)', fontSize: 13 }}>
+              需求池所属部门
+            </div>
+            <Select
+              placeholder="选择部门（该部门成员才能看到并领取）"
+              style={{ width: '100%' }}
+              value={departmentId ?? undefined}
+              onChange={setDepartmentId}
+              options={departments.map((d) => ({ label: d.name, value: d.id }))}
+            />
+          </div>
+        )}
       </div>
     </Modal>
   )
@@ -152,8 +176,14 @@ interface Props {
   me: Pick<User, 'id' | 'role'>
   isSuperAdmin: boolean
   assignees: User[]
+  departments: Department[]
   onOpenCard: (id: number) => void
-  onAddCard: (colId: number, title: string, assigneeId?: number | null) => void
+  onAddCard: (
+    colId: number,
+    title: string,
+    assigneeId?: number | null,
+    departmentId?: number | null,
+  ) => void
   onRenameColumn: (colId: number, name: string) => void
   onDeleteColumn: (colId: number) => void
   onSetFinal: (colId: number, isFinal: boolean) => void
@@ -168,6 +198,7 @@ export function BoardColumnView({
   me,
   isSuperAdmin,
   assignees,
+  departments,
   onOpenCard,
   onAddCard,
   onRenameColumn,
@@ -291,9 +322,11 @@ export function BoardColumnView({
             <AddCardModal
               open={modalOpen}
               assignees={assignees}
+              departments={departments}
+              isSuperAdmin={isSuperAdmin}
               onCancel={() => setModalOpen(false)}
-              onCreate={(t, assigneeId) => {
-                onAddCard(col.id, t, assigneeId)
+              onCreate={(t, assigneeId, departmentId) => {
+                onAddCard(col.id, t, assigneeId, departmentId)
                 setModalOpen(false)
               }}
             />

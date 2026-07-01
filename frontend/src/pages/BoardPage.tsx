@@ -15,6 +15,7 @@ import {
   createTask,
   deleteColumn,
   getAssignableUsers,
+  getDepartments,
   getBoards,
   getColumns,
   getTasks,
@@ -78,6 +79,13 @@ export function BoardPage() {
     enabled: isManager,
   })
 
+  // super_admin picks which department's pool a card joins (they have none).
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments'],
+    queryFn: getDepartments,
+    enabled: isSuperAdmin,
+  })
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
@@ -102,12 +110,22 @@ export function BoardPage() {
   })
 
   const addCardM = useMutation({
-    mutationFn: ({ title, assigneeId }: { title: string; assigneeId?: number | null }) => {
+    mutationFn: ({
+      title,
+      assigneeId,
+      departmentId,
+    }: {
+      title: string
+      assigneeId?: number | null
+      departmentId?: number | null
+    }) => {
       // member: self-submit -> pending_approval (no assignee choice).
       // admin/super: chosen assignee -> on_board; left empty -> open pool (keeps board info).
       if (user?.role === 'member') return createTask({ title, board_id: boardId! })
       const body: CreateTaskBody = { title, board_id: boardId! }
       if (assigneeId != null) body.assignee_id = assigneeId
+      // super_admin has no department: they pick which department's pool to seed.
+      if (departmentId != null) body.department_id = departmentId
       return createTask(body)
     },
     onSuccess: (task) => {
@@ -259,8 +277,11 @@ export function BoardPage() {
                 me={{ id: user!.id, role: user!.role }}
                 isSuperAdmin={isSuperAdmin}
                 assignees={assignees}
+                departments={departments}
                 onOpenCard={openCard}
-                onAddCard={(_colId, title, assigneeId) => addCardM.mutate({ title, assigneeId })}
+                onAddCard={(_colId, title, assigneeId, departmentId) =>
+                  addCardM.mutate({ title, assigneeId, departmentId })
+                }
                 onRenameColumn={(colId, name) => renameColM.mutate({ colId, name })}
                 onDeleteColumn={(colId) => deleteColM.mutate(colId)}
                 onSetFinal={(colId, isFinal) => setFinalM.mutate({ colId, isFinal })}

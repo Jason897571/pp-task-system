@@ -172,7 +172,12 @@ def create_task(
         log_activity(db, task, user, "assigned")
         notify(db, assignee.id, "assigned", f"你被指派了任务「{task.title}」", task.id)
     else:
-        # admin w/o assignee -> open pool
+        # admin/super w/o assignee -> open pool. The pool is department-scoped, so
+        # a department-less task would be invisible to everyone but super_admin.
+        # admins inherit their own department above; super_admin has none and must
+        # pick one explicitly.
+        if department_id is None:
+            raise HTTPException(status_code=400, detail="需求池任务需要指定部门")
         task.lifecycle = "open"
         task.assignee_id = None
         task.column_id = None
