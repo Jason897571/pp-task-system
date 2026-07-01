@@ -35,6 +35,7 @@ from app.schemas import (
 )
 from app.services import (
     admin_can_touch_task,
+    apply_assignee,
     board_can_see,
     can_edit_task,
     column_of_kind,
@@ -163,7 +164,7 @@ def create_task(
         col = start_column(db, body.board_id)
         if col is None:
             raise HTTPException(status_code=409, detail="看板没有可用的起始列")
-        task.assignee_id = assignee.id
+        apply_assignee(task, assignee)
         task.lifecycle = "on_board"
         task.column_id = col.id
         db.add(task)
@@ -255,7 +256,7 @@ def assign_task(
         raise HTTPException(status_code=409, detail="看板没有可用的起始列")
 
     was_open = task.lifecycle == "open"
-    task.assignee_id = assignee.id
+    apply_assignee(task, assignee)
     task.lifecycle = "on_board"
     if was_open or task.column_id is None:
         task.column_id = col.id
@@ -338,7 +339,7 @@ def approve_task(
     if col is None:
         raise HTTPException(status_code=409, detail="看板没有可用的起始列")
 
-    task.assignee_id = assignee.id
+    apply_assignee(task, assignee)
     task.lifecycle = "on_board"
     task.column_id = col.id
     log_activity(db, task, user, "approved")
@@ -644,7 +645,9 @@ def duplicate_task(
         description=src.description,
         creator_id=user.id,
         assignee_id=assignee.id,
-        department_id=src.department_id,
+        department_id=(
+            assignee.department_id if assignee.department_id is not None else src.department_id
+        ),
         board_id=src.board_id,
         column_id=col.id,
         lifecycle="on_board",

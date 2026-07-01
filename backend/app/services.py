@@ -116,6 +116,18 @@ def log_activity(
     return act
 
 
+def apply_assignee(task: Task, assignee: User) -> None:
+    """Attach an assignee to a task and make the task belong to that assignee's
+    department. A task's owning department follows whoever is responsible for it,
+    so the assignee's department admins keep it in scope (admin_can_touch_task is
+    department-scoped). Without this, a task assigned/reassigned across departments
+    — or one created by a super_admin (no department) — becomes invisible to the
+    managing admin after a hand-off."""
+    task.assignee_id = assignee.id
+    if assignee.department_id is not None:
+        task.department_id = assignee.department_id
+
+
 def admin_can_touch_task(user: User, task: Task) -> bool:
     """admin scope: own department + tasks created/participated in."""
     if user.role == "super_admin":

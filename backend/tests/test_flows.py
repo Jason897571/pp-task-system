@@ -1026,3 +1026,47 @@ def test_task_links_symmetric(client, db, world):
     assert client.post(
         f"/api/tasks/{a['id']}/links", headers=other, json={"linked_task_id": b["id"]}
     ).status_code in (401, 403)
+
+
+# --------------------------------------------------------------------------
+# Regression: reassigning a task must not make it vanish (bug: department_id
+# not tracking the new assignee, so admin_can_touch_task loses dept-scope).
+# --------------------------------------------------------------------------
+
+
+def test_reassign_keeps_task_visible(client, world):
+    sup = auth_header(client, "super", "pw")
+    admin = auth_header(client, "admin", "pw")  # 研发 admin
+
+    # super assigns a task to the 研发 admin. Super has no department, so the
+    # task is created with department_id = None (the real-world "orphan" case).
+    t = client.post(
+        "/api/tasks",
+        headers=sup,
+        json={
+            "title": "鑫杰测试seedream4.5是否支持生成2张图",
+            "board_id": world["board"].id,
+            "assignee_id": world["admin"].id,
+        },
+    ).json()
+
+    # admin sees it while it's assigned to them.
+    before = {x["id"] for x in client.get("/api/tasks", headers=admin).json()}
+    assert t["id"] in before
+
+    # admin delegates it to a member in their own department.
+    r = client.post(
+        f"/api/tasks/{t['id']}/assign",
+        headers=admin,
+        json={"assignee_id": world["member"].id},
+    )
+    assert r.status_code == 200, r.text
+
+    # The task must still be visible to the delegating admin (their department).
+    after = {x["id"] for x in client.get("/api/tasks", headers=admin).json()}
+    assert t["id"] in after, "reassigned task vanished from the admin's board"
+
+    # ...and to the new assignee.
+    member = auth_header(client, "member", "pw")
+    mids = {x["id"] for x in client.get("/api/tasks", headers=member).json()}
+    assert t["id"] in mids
