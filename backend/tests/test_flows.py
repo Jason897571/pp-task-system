@@ -1134,3 +1134,31 @@ def test_archived_at_set_on_archive_and_cleared_on_restore(client, world):
         json={"board_id": world["board"].id, "column_id": world["cols"]["start"].id},
     )
     assert client.get(f"/api/tasks/{t['id']}", headers=sup).json()["archived_at"] is None
+
+
+def test_restore_to_origin_lands_in_final_column(client, world):
+    sup = auth_header(client, "super", "pw")
+    admin = auth_header(client, "admin", "pw")
+    member = auth_header(client, "member", "pw")
+    done = world["cols"]["done"]
+    client.put(f"/api/columns/{done.id}", headers=sup, json={"is_final": True})
+
+    # drive a card to the final column, then archive it
+    t = _assigned_task(client, world)
+    client.post(f"/api/tasks/{t['id']}/start", headers=member)
+    client.post(f"/api/tasks/{t['id']}/submit", headers=member, json={"note": "done"})
+    client.post(f"/api/tasks/{t['id']}/review", headers=admin, json={"approve": True})
+    client.post("/api/boards/archive-now", headers=sup)
+
+    # one-click restore -> back on the origin board's final column, un-archived
+    r = client.post(f"/api/tasks/{t['id']}/restore-to-origin", headers=admin)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["board_id"] == world["board"].id
+    assert body["column_id"] == done.id
+    assert body["archived_at"] is None
+
+    # a non-archived card can't be "restored"
+    assert (
+        client.post(f"/api/tasks/{t['id']}/restore-to-origin", headers=admin).status_code == 409
+    )

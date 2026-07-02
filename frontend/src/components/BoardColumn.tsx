@@ -163,7 +163,7 @@ function DraggableCard({
             onRestore(task)
           }}
         >
-          ↩ 放回看板
+          ↩ 放回原看板
         </button>
       )}
     </div>

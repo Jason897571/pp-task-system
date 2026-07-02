@@ -97,6 +97,17 @@ def column_of_kind(db: Session, board_id: int, kind: str) -> BoardColumn | None:
     ).first()
 
 
+def final_column(db: Session, board_id: int) -> BoardColumn | None:
+    """The board's final-acceptance column (super_admin toggles is_final). None if
+    the board has no such column."""
+    return db.scalars(
+        select(BoardColumn)
+        .where(BoardColumn.board_id == board_id, BoardColumn.is_final.is_(True))
+        .order_by(BoardColumn.position)
+        .limit(1)
+    ).first()
+
+
 def review_column(db: Session, board_id: int) -> BoardColumn | None:
     """The board's single review gate (super_admin toggles requires_review).
     None means this board has no review step."""

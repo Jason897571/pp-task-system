@@ -20,12 +20,12 @@ import {
   getColumns,
   getTasks,
   moveTask,
+  restoreTaskToOrigin,
   updateColumn,
 } from '../api/endpoints'
 import { errMessage } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { BoardColumnView } from '../components/BoardColumn'
-import { RestoreModal } from '../components/RestoreModal'
 import { DuplicateModal } from '../components/DuplicateModal'
 import { PRIORITY_RANK } from '../lib/badges'
 import { CardDetailModal } from '../components/CardDetailModal'
@@ -57,7 +57,6 @@ export function BoardPage() {
   const isSuperAdmin = user?.role === 'super_admin'
   const isManager = user?.role === 'admin' || isSuperAdmin
   const isArchive = !!board?.is_archive
-  const [restoreTask, setRestoreTask] = useState<Task | null>(null)
   const [copyTask, setCopyTask] = useState<Task | null>(null)
   // admin/super: toggle between everyone's cards and only my own on this board.
   const [mineOnly, setMineOnly] = useState(false)
@@ -200,6 +199,16 @@ export function BoardPage() {
     onError: (e) => message.error(errMessage(e)),
   })
 
+  // 放回原看板：一键还原到原看板的「最终验收」列（归档来源）。
+  const restoreOriginM = useMutation({
+    mutationFn: (id: number) => restoreTaskToOrigin(id),
+    onSuccess: () => {
+      message.success('已放回原看板的最终验收列')
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
+
   const onDragEnd = (e: DragEndEvent) => {
     const task = e.active.data.current?.task as Task | undefined
     const targetCol = e.over?.data.current?.col as BoardColumn | undefined
@@ -312,6 +321,18 @@ export function BoardPage() {
                     onClick={() => openCard(t.id)}
                   >
                     <CardFront task={t} columnKind="done" isFinal />
+                    {isManager && (
+                      <button
+                        type="button"
+                        className="card-restore"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          restoreOriginM.mutate(t.id)
+                        }}
+                      >
+                        ↩ 放回原看板
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -338,7 +359,9 @@ export function BoardPage() {
                 onDeleteColumn={(colId) => deleteColM.mutate(colId)}
                 onSetFinal={(colId, isFinal) => setFinalM.mutate({ colId, isFinal })}
                 onSetReview={(colId, requiresReview) => setReviewM.mutate({ colId, requiresReview })}
-                onRestore={isArchive && isManager ? setRestoreTask : undefined}
+                onRestore={
+                  isArchive && isManager ? (t) => restoreOriginM.mutate(t.id) : undefined
+                }
                 onCopy={isManager && !isArchive ? setCopyTask : undefined}
               />
             ))}
@@ -362,10 +385,6 @@ export function BoardPage() {
 
       {taskIdParam && (
         <CardDetailModal taskId={Number(taskIdParam)} columns={columns} onClose={closeCard} />
-      )}
-
-      {restoreTask && (
-        <RestoreModal task={restoreTask} boards={boards} onClose={() => setRestoreTask(null)} />
       )}
 
       {copyTask && <DuplicateModal task={copyTask} onClose={() => setCopyTask(null)} />}

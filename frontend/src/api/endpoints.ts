@@ -126,6 +126,10 @@ export const purgeTask = (id: number) =>
 export const moveTaskToBoard = (id: number, board_id: number, column_id: number) =>
   api.post<Task>(`/tasks/${id}/move-to-board`, { board_id, column_id }).then((r) => r.data)
 
+// One-click: restore an archived card to its origin board's final-acceptance column.
+export const restoreTaskToOrigin = (id: number) =>
+  api.post<Task>(`/tasks/${id}/restore-to-origin`).then((r) => r.data)
+
 export const startTask = (id: number) =>
   api.post<Task>(`/tasks/${id}/start`).then((r) => r.data)
 

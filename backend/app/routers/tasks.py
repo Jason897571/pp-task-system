@@ -40,6 +40,7 @@ from app.services import (
     can_edit_task,
     column_of_kind,
     copy_requirement_children,
+    final_column,
     hard_delete_task,
     log_activity,
     notify,
@@ -419,6 +420,42 @@ def move_task_to_board(
     task.board_id = board.id
     task.column_id = col.id
     task.archived_at = None  # leaving the archive board clears its archive time
+    db.commit()
+    db.refresh(task)
+    return serialize_task(db, task)
+
+
+@router.post("/tasks/{task_id}/restore-to-origin", response_model=TaskOut)
+def restore_to_origin(
+    task_id: int,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """One-click restore of an archived card back to its ORIGIN board's final-
+    acceptance column (the card was archived from there). Falls back to the origin
+    board's start column if it no longer has a final column. admin/super only."""
+    task = db.get(Task, task_id)
+    if task is None or task.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not admin_can_touch_task(user, task):
+        raise HTTPException(status_code=403, detail="无权放回该任务")
+    if task.archived_at is None:
+        raise HTTPException(status_code=409, detail="任务不在归档看板")
+
+    # The archive column records where the card came from via source_board_id.
+    arc_col = db.get(BoardColumn, task.column_id) if task.column_id else None
+    origin_id = arc_col.source_board_id if arc_col else None
+    origin = db.get(Board, origin_id) if origin_id else None
+    if origin is None:
+        raise HTTPException(status_code=409, detail="原看板已删除，无法放回")
+
+    target = final_column(db, origin.id) or start_column(db, origin.id)
+    if target is None:
+        raise HTTPException(status_code=409, detail="原看板没有可用的列")
+
+    task.board_id = origin.id
+    task.column_id = target.id
+    task.archived_at = None
     db.commit()
     db.refresh(task)
     return serialize_task(db, task)
