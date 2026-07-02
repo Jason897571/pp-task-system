@@ -143,6 +143,9 @@ class Task(Base):
     due_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Soft delete: non-null = in the recycle bin (purged 30 days after this time).
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    # When the card was swept into the archive board (drives the 归档看板 weekly view).
+    # Non-null only while the card lives on the archive board; cleared if restored.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

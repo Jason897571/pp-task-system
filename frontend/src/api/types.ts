@@ -105,6 +105,7 @@ export interface Task {
   is_mandatory: boolean
   due_date: string | null
   deleted_at: string | null
+  archived_at: string | null // set while on the archive board (归档看板 weekly view)
   created_at: string
   updated_at: string
   // Round-2 additions (present on every Task the backend returns):

@@ -1101,3 +1101,36 @@ def test_super_pool_task_requires_department(client, world):
     assert r2.status_code == 200, r2.text
     assert r2.json()["lifecycle"] == "open"
     assert r2.json()["department_id"] == world["rnd"].id
+
+
+# --------------------------------------------------------------------------
+# archived_at drives the 归档看板 weekly view: set on sweep, cleared on restore.
+# --------------------------------------------------------------------------
+
+
+def test_archived_at_set_on_archive_and_cleared_on_restore(client, world):
+    sup = auth_header(client, "super", "pw")
+    admin = auth_header(client, "admin", "pw")
+    member = auth_header(client, "member", "pw")
+    done = world["cols"]["done"]
+    client.put(f"/api/columns/{done.id}", headers=sup, json={"is_final": True})
+
+    # drive a card to the final column, then sweep into the archive
+    t = _assigned_task(client, world)
+    client.post(f"/api/tasks/{t['id']}/start", headers=member)
+    client.post(f"/api/tasks/{t['id']}/submit", headers=member, json={"note": "done"})
+    client.post(f"/api/tasks/{t['id']}/review", headers=admin, json={"approve": True})
+
+    # before archive: no archive time
+    assert client.get(f"/api/tasks/{t['id']}", headers=sup).json()["archived_at"] is None
+
+    client.post("/api/boards/archive-now", headers=sup)
+    assert client.get(f"/api/tasks/{t['id']}", headers=sup).json()["archived_at"] is not None
+
+    # restoring it off the archive board clears archived_at again
+    client.post(
+        f"/api/tasks/{t['id']}/move-to-board",
+        headers=admin,
+        json={"board_id": world["board"].id, "column_id": world["cols"]["start"].id},
+    )
+    assert client.get(f"/api/tasks/{t['id']}", headers=sup).json()["archived_at"] is None

@@ -542,6 +542,7 @@ def archive_completed_tasks(db: Session, today: date | None = None) -> int:
             Task.deleted_at.is_(None),
         )
     ).all()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     count = 0
     for task in tasks:
         source = db.get(Board, task.board_id)
@@ -550,6 +551,7 @@ def archive_completed_tasks(db: Session, today: date | None = None) -> int:
         col = get_or_create_archive_column(db, archive, source)
         task.board_id = archive.id
         task.column_id = col.id
+        task.archived_at = now
         count += 1
     return count
 

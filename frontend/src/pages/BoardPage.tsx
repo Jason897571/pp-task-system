@@ -29,6 +29,8 @@ import { RestoreModal } from '../components/RestoreModal'
 import { DuplicateModal } from '../components/DuplicateModal'
 import { PRIORITY_RANK } from '../lib/badges'
 import { CardDetailModal } from '../components/CardDetailModal'
+import { CardFront } from '../components/TaskCard'
+import { groupByWeek } from '../lib/weeks'
 import { canDropInto } from '../lib/actions'
 import type { BoardColumn, CreateTaskBody, Task } from '../api/types'
 
@@ -59,6 +61,10 @@ export function BoardPage() {
   const [copyTask, setCopyTask] = useState<Task | null>(null)
   // admin/super: toggle between everyone's cards and only my own on this board.
   const [mineOnly, setMineOnly] = useState(false)
+  // archive board only: group cards by source board (default) or by archive week.
+  const [archiveView, setArchiveView] = useState<'source' | 'week'>(() =>
+    localStorage.getItem('archiveView') === 'week' ? 'week' : 'source',
+  )
 
   const { data: columns = [], isLoading: colsLoading } = useQuery({
     queryKey: ['columns', boardId],
@@ -228,6 +234,9 @@ export function BoardPage() {
       .filter((t) => t.column_id === colId)
       .sort((a, b) => (PRIORITY_RANK[a.priority] ?? 1) - (PRIORITY_RANK[b.priority] ?? 1))
 
+  const weekView = isArchive && archiveView === 'week'
+  const weekGroups = weekView ? groupByWeek(visibleTasks) : []
+
   return (
     <>
       <div className="board-header">
@@ -244,6 +253,21 @@ export function BoardPage() {
           <Button size="small" loading={archiveM.isPending} onClick={() => archiveM.mutate()}>
             立即归档已完成
           </Button>
+        )}
+        {isArchive && (
+          <Segmented
+            size="small"
+            value={archiveView}
+            onChange={(v) => {
+              const val = v as 'source' | 'week'
+              setArchiveView(val)
+              localStorage.setItem('archiveView', val)
+            }}
+            options={[
+              { label: '按来源看板', value: 'source' },
+              { label: '按周', value: 'week' },
+            ]}
+          />
         )}
         {isManager && (
           <Segmented
@@ -266,6 +290,34 @@ export function BoardPage() {
         <div style={{ display: 'grid', placeItems: 'center', flex: 1 }}>
           <Empty description="暂无可见看板" />
         </div>
+      ) : weekView ? (
+        weekGroups.length === 0 ? (
+          <div style={{ display: 'grid', placeItems: 'center', flex: 1 }}>
+            <Empty description="暂无归档卡片" />
+          </div>
+        ) : (
+          <div className="lists">
+            {weekGroups.map((g) => (
+              <div key={g.key} className="list">
+                <div className="list-head">
+                  <span>{g.label}</span>
+                  {g.isCurrent && <span className="col-final-tag">本周</span>}
+                  <span className="count">{g.tasks.length}</span>
+                </div>
+                {g.tasks.map((t) => (
+                  <div
+                    key={t.id}
+                    className="card card-done"
+                    data-spine={t.priority === 'high' ? 'high' : undefined}
+                    onClick={() => openCard(t.id)}
+                  >
+                    <CardFront task={t} columnKind="done" isFinal />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )
       ) : (
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           <div className="lists">

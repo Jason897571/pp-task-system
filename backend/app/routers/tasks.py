@@ -418,6 +418,7 @@ def move_task_to_board(
 
     task.board_id = board.id
     task.column_id = col.id
+    task.archived_at = None  # leaving the archive board clears its archive time
     db.commit()
     db.refresh(task)
     return serialize_task(db, task)
