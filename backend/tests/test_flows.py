@@ -1162,3 +1162,16 @@ def test_restore_to_origin_lands_in_final_column(client, world):
     assert (
         client.post(f"/api/tasks/{t['id']}/restore-to-origin", headers=admin).status_code == 409
     )
+
+
+def test_update_task_title(client, world):
+    admin = auth_header(client, "admin", "pw")
+    t = _assigned_task(client, world)
+    r = client.put(f"/api/tasks/{t['id']}", headers=admin, json={"title": "改后的标题"})
+    assert r.status_code == 200, r.text
+    assert r.json()["title"] == "改后的标题"
+    # a member who is neither manager nor assignee cannot edit the title
+    other = auth_header(client, "member2", "pw")
+    assert (
+        client.put(f"/api/tasks/{t['id']}", headers=other, json={"title": "x"}).status_code == 403
+    )

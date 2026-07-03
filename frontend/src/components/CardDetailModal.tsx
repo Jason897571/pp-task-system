@@ -101,8 +101,12 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
     },
   })
   const updateM = useMutation({
-    mutationFn: (body: { description?: string; due_date?: string | null; priority?: string }) =>
-      updateTask(taskId, body),
+    mutationFn: (body: {
+      title?: string
+      description?: string
+      due_date?: string | null
+      priority?: string
+    }) => updateTask(taskId, body),
   })
   const deleteM = useMutation({
     mutationFn: () => deleteTask(taskId),
@@ -123,7 +127,9 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
     assignM.isPending ||
     toPoolM.isPending
 
-  // Inline description editing (admin/super) + inline 产出 composer state.
+  // Inline title + description editing (admin/super) + inline 产出 composer state.
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
   const [editingDesc, setEditingDesc] = useState(false)
   const [descDraft, setDescDraft] = useState('')
   const [outNote, setOutNote] = useState('')
@@ -140,6 +146,26 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
   const canCompose =
     !!task && !!user && columnKind === 'doing' && (isManager || task.assignee?.id === user.id)
 
+  const saveTitle = () => {
+    const next = titleDraft.trim()
+    if (!next) {
+      message.warning('标题不能为空')
+      return
+    }
+    if (task && next === task.title) {
+      setEditingTitle(false)
+      return
+    }
+    updateM
+      .mutateAsync({ title: next })
+      .then(() => {
+        message.success('已更新标题')
+        setEditingTitle(false)
+        invalidate()
+      })
+      .catch((e) => message.error(errMessage(e)))
+  }
+
   const saveDesc = () => {
     updateM
       .mutateAsync({ description: descDraft })
@@ -151,9 +177,18 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
       .catch((e) => message.error(errMessage(e)))
   }
 
-  // Closing the card (e.g. clicking outside) while a description edit is open
+  // Closing the card (e.g. clicking outside) while a title/description edit is open
   // would normally drop the draft — auto-save it instead so nothing is lost.
   const handleClose = () => {
+    if (editingTitle && task && titleDraft.trim() && titleDraft.trim() !== task.title) {
+      updateM
+        .mutateAsync({ title: titleDraft.trim() })
+        .then(() => {
+          message.success('已自动保存标题')
+          invalidate()
+        })
+        .catch((e) => message.error(errMessage(e, '标题自动保存失败')))
+    }
     if (editingDesc && task && descDraft !== (task.description ?? '')) {
       updateM
         .mutateAsync({ description: descDraft })
@@ -276,7 +311,35 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
             <div className="cm-zonetag">需求 · REQUIREMENT</div>
             <div className="cm-titlerow">
               <span className="cm-no" title="任务编号">#{task.id}</span>
-              <h2 className="cm-title">{task.title}</h2>
+              {editingTitle && isManager ? (
+                <Input.TextArea
+                  className="cm-title-input"
+                  autoFocus
+                  autoSize
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onPressEnter={(e) => {
+                    e.preventDefault()
+                    saveTitle()
+                  }}
+                  onBlur={saveTitle}
+                />
+              ) : (
+                <h2
+                  className={`cm-title ${isManager ? 'editable' : ''}`}
+                  title={isManager ? '点击编辑标题' : undefined}
+                  onClick={
+                    isManager
+                      ? () => {
+                          setTitleDraft(task.title)
+                          setEditingTitle(true)
+                        }
+                      : undefined
+                  }
+                >
+                  {task.title}
+                </h2>
+              )}
             </div>
             <div className="cm-chips">
               {task.assignee ? (

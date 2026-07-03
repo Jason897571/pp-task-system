@@ -728,6 +728,28 @@ body {
   letter-spacing: -0.3px;
   word-break: break-word;
 }
+.cm-title.editable {
+  cursor: text;
+  border-radius: 6px;
+  transition: background 0.12s ease;
+}
+.cm-title.editable:hover {
+  background: #ffffff0f;
+}
+.cm-title-input.ant-input,
+.cm-title-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 23px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.26;
+  letter-spacing: -0.3px;
+  background: #0a0d17;
+  border: 1px solid #7c5cff66;
+  border-radius: 8px;
+  padding: 4px 10px;
+}
 .cm-chips {
   display: flex;
   flex-wrap: wrap;
