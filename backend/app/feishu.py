@@ -13,19 +13,19 @@ import urllib.request
 FEISHU_BASE = "https://open.feishu.cn/open-apis"
 
 
-def post_bot_webhook(webhook_url: str, text: str) -> None:
-    """Fire-and-forget a text message to a Feishu custom-bot webhook.
+def _post_webhook(webhook_url: str, payload: dict) -> None:
+    """Fire-and-forget a payload to a Feishu custom-bot webhook.
 
     Runs in a daemon thread so a slow/unreachable webhook never blocks the API
     request, and swallows all errors (a notification failure must not break the
     underlying task action).
     """
-    if not webhook_url or not text:
+    if not webhook_url:
         return
 
     def _send():
         try:
-            body = json.dumps({"msg_type": "text", "content": {"text": text}}).encode()
+            body = json.dumps(payload).encode()
             req = urllib.request.Request(
                 webhook_url, data=body, headers={"Content-Type": "application/json"}, method="POST"
             )
@@ -34,6 +34,68 @@ def post_bot_webhook(webhook_url: str, text: str) -> None:
             pass
 
     threading.Thread(target=_send, daemon=True).start()
+
+
+def post_bot_webhook(webhook_url: str, text: str) -> None:
+    """Send a plain-text message to the group bot."""
+    if not text:
+        return
+    _post_webhook(webhook_url, {"msg_type": "text", "content": {"text": text}})
+
+
+def post_bot_card(webhook_url: str, card: dict) -> None:
+    """Send an interactive card message to the group bot."""
+    if not card:
+        return
+    _post_webhook(webhook_url, {"msg_type": "interactive", "card": card})
+
+
+# Priority -> (badge label shown in the card body, header color template).
+_PRIORITY_CARD = {
+    "high": ("🔴 P0", "red"),
+    "normal": ("🟡 P1", "blue"),
+    "low": ("⚪ P2", "grey"),
+}
+_DETAIL_MAX = 120
+
+
+def build_task_card(
+    *,
+    header: str,
+    footer: str,
+    title: str,
+    priority: str,
+    due_date: str | None = None,
+    description: str | None = None,
+    assignee_open_id: str | None = None,
+    assignee_name: str = "某人",
+) -> dict:
+    """Build a Feishu interactive card for a task-assignment notification.
+
+    Pure function: `due_date` is a pre-formatted string (caller handles timezone),
+    `description` is truncated here. @-mentions the assignee via <at id=...> when an
+    open_id is known, else falls back to a plain @name (visible, no hard ping)."""
+    badge, color = _PRIORITY_CARD.get(priority, (priority, "blue"))
+    mention = f"<at id={assignee_open_id}></at>" if assignee_open_id else f"@{assignee_name}"
+
+    lines = [mention, "", f"**🏷 标题**　{title}", f"**🔥 紧急**　{badge}"]
+    if due_date:
+        lines.append(f"**📅 DDL**　{due_date}")
+    if description:
+        detail = " ".join(description.split())
+        if len(detail) > _DETAIL_MAX:
+            detail = detail[:_DETAIL_MAX] + "…"
+        lines.append(f"**📄 详情**　{detail}")
+
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {"template": color, "title": {"tag": "plain_text", "content": header}},
+        "elements": [
+            {"tag": "div", "text": {"tag": "lark_md", "content": "\n".join(lines)}},
+            {"tag": "hr"},
+            {"tag": "note", "elements": [{"tag": "plain_text", "content": footer}]},
+        ],
+    }
 
 # Field types we use (Feishu bitable field type ids).
 FT_TEXT = 1

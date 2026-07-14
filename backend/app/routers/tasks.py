@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user, require_admin
-from app.feishu import post_bot_webhook
+from app.feishu import build_task_card, post_bot_card, post_bot_webhook
 from app.models import (
     Board,
     BoardColumn,
@@ -58,8 +59,33 @@ router = APIRouter(prefix="/api", tags=["tasks"])
 
 
 def _feishu(text: str) -> None:
-    """Post a task notification to the group bot (best-effort, non-blocking)."""
+    """Post a plain-text task notification to the group bot (best-effort)."""
     post_bot_webhook(settings.feishu_bot_webhook, text)
+
+
+_SHANGHAI = ZoneInfo("Asia/Shanghai")
+
+
+def _due_text(task: Task) -> str | None:
+    """Format a task's naive-UTC due_date as a local (Asia/Shanghai) yyyy-mm-dd."""
+    if task.due_date is None:
+        return None
+    return task.due_date.replace(tzinfo=timezone.utc).astimezone(_SHANGHAI).strftime("%Y-%m-%d")
+
+
+def _feishu_task_card(task: Task, assignee: User | None, header: str, footer: str) -> None:
+    """Post an assignment card (title / DDL / priority / detail) to the group bot."""
+    card = build_task_card(
+        header=header,
+        footer=footer,
+        title=task.title,
+        priority=task.priority,
+        due_date=_due_text(task),
+        description=task.description,
+        assignee_open_id=assignee.feishu_open_id if assignee else None,
+        assignee_name=_name(assignee),
+    )
+    post_bot_card(settings.feishu_bot_webhook, card)
 
 
 def _name(user: User | None) -> str:
@@ -189,10 +215,7 @@ def create_task(
     db.commit()
     db.refresh(task)
     if task.lifecycle == "on_board" and task.assignee is not None:
-        _feishu(
-            f"📌 {_at(task.assignee)}，你被指派了新任务「{task.title}」"
-            f"（指派人：{_name(user)}）"
-        )
+        _feishu_task_card(task, task.assignee, "📌 新任务指派", f"指派人：{_name(user)}")
     return serialize_task(db, task)
 
 
@@ -272,11 +295,8 @@ def assign_task(
     notify(db, assignee.id, "assigned", f"你被指派了任务「{task.title}」", task.id)
     db.commit()
     db.refresh(task)
-    verb = "转派给" if is_reassign else "指派给"
-    _feishu(
-        f"📌 {_at(assignee)}，任务「{task.title}」已{verb}你"
-        f"（操作人：{_name(user)}）"
-    )
+    header = "📌 任务转派" if is_reassign else "📌 任务指派"
+    _feishu_task_card(task, assignee, header, f"操作人：{_name(user)}")
     return serialize_task(db, task)
 
 
@@ -354,10 +374,7 @@ def approve_task(
     notify(db, assignee.id, "assigned", f"你被指派了任务「{task.title}」", task.id)
     db.commit()
     db.refresh(task)
-    _feishu(
-        f"📌 {_at(assignee)}，任务「{task.title}」已通过审批并指派给你"
-        f"（审批人：{_name(user)}）"
-    )
+    _feishu_task_card(task, assignee, "📌 审批通过并指派", f"审批人：{_name(user)}")
     return serialize_task(db, task)
 
 
@@ -716,9 +733,7 @@ def duplicate_task(
     notify(db, assignee.id, "assigned", f"你被指派了任务「{dst.title}」", dst.id)
     db.commit()
     db.refresh(dst)
-    _feishu(
-        f"📌 {_at(assignee)}，你被指派了新任务「{dst.title}」（指派人：{_name(user)}）"
-    )
+    _feishu_task_card(dst, assignee, "📌 新任务指派", f"指派人：{_name(user)}")
     return serialize_task(db, dst)
 
 
