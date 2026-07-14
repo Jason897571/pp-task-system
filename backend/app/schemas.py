@@ -86,12 +86,13 @@ class TaskOut(BaseModel):
     due_date: datetime | None
     deleted_at: datetime | None = None
     archived_at: datetime | None = None
+    completed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     tags: list[TagOut] = []
     checklist_stats: ChecklistStats = ChecklistStats(done=0, total=0)
 
-    @field_serializer("due_date", "deleted_at", "archived_at")
+    @field_serializer("due_date", "deleted_at", "archived_at", "completed_at")
     def _serialize_utc(self, v: datetime | None) -> str | None:
         # due_date / deleted_at are stored naive-UTC. Mark them UTC on the way out
         # so the browser converts to local time instead of reading the bare string

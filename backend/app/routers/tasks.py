@@ -49,6 +49,7 @@ from app.services import (
     serialize_linked_task,
     serialize_task,
     serialize_task_detail,
+    stamp_completion,
     start_column,
     visible_board_ids,
 )
@@ -388,7 +389,9 @@ def move_task(
     elif not admin_can_touch_task(user, task):
         raise HTTPException(status_code=403, detail="无权移动该任务")
 
+    prev_col_id = task.column_id
     task.column_id = col.id
+    stamp_completion(task, col, prev_col_id)
     db.commit()
     db.refresh(task)
     return serialize_task(db, task)
@@ -417,9 +420,11 @@ def move_task_to_board(
     if col is None or col.board_id != body.board_id:
         raise HTTPException(status_code=400, detail="目标列不属于该看板")
 
+    prev_col_id = task.column_id
     task.board_id = board.id
     task.column_id = col.id
     task.archived_at = None  # leaving the archive board clears its archive time
+    stamp_completion(task, col, prev_col_id)
     db.commit()
     db.refresh(task)
     return serialize_task(db, task)
@@ -453,9 +458,11 @@ def restore_to_origin(
     if target is None:
         raise HTTPException(status_code=409, detail="原看板没有可用的列")
 
+    prev_col_id = task.column_id
     task.board_id = origin.id
     task.column_id = target.id
     task.archived_at = None
+    stamp_completion(task, target, prev_col_id)
     db.commit()
     db.refresh(task)
     return serialize_task(db, task)
@@ -513,7 +520,9 @@ def submit_task(
         done = column_of_kind(db, task.board_id, "done")
         if done is None:
             raise HTTPException(status_code=409, detail="看板没有完成列")
+        prev_col_id = task.column_id
         task.column_id = done.id
+        stamp_completion(task, done, prev_col_id)
         task.is_rework = False
         log_activity(db, task, user, "submitted", comment=body.note)
     db.commit()
@@ -546,7 +555,9 @@ def review_task(
         done = column_of_kind(db, task.board_id, "done")
         if done is None:
             raise HTTPException(status_code=409, detail="看板没有完成列")
+        prev_col_id = task.column_id
         task.column_id = done.id
+        stamp_completion(task, done, prev_col_id)
         task.is_rework = False
         log_activity(db, task, user, "approved")
         if task.assignee_id is not None:

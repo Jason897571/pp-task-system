@@ -534,6 +534,14 @@ def get_or_create_archive_column(db: Session, archive: Board, source: Board) -> 
     return col
 
 
+def stamp_completion(task: Task, new_col: BoardColumn | None, prev_col_id: int | None) -> None:
+    """Record the completion time when a card enters the final-acceptance (is_final)
+    column. Overwrites on re-entry; only fires when the column actually changed.
+    Statistics only. Call after assigning task.column_id (passing the old id)."""
+    if new_col is not None and new_col.is_final and new_col.id != prev_col_id:
+        task.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def archive_completed_tasks(db: Session, today: date | None = None) -> int:
     """Sweep every on-board card sitting in an is_final column into the archive
     board, each under a column named after its origin board. Returns the number

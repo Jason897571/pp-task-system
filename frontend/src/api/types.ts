@@ -106,6 +106,7 @@ export interface Task {
   due_date: string | null
   deleted_at: string | null
   archived_at: string | null // set while on the archive board (归档看板 weekly view)
+  completed_at: string | null // set when the card entered the final-acceptance column (stats only)
   created_at: string
   updated_at: string
   // Round-2 additions (present on every Task the backend returns):

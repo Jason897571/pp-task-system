@@ -1164,6 +1164,76 @@ def test_restore_to_origin_lands_in_final_column(client, world):
     )
 
 
+# --------------------------------------------------------------------------
+# completed_at: stamped when a card enters an is_final column (口径 A).
+# Overwrites on re-entry; not cleared when leaving. Only for statistics.
+# --------------------------------------------------------------------------
+
+
+def _drive_to_done(client, world, t):
+    member = auth_header(client, "member", "pw")
+    admin = auth_header(client, "admin", "pw")
+    client.post(f"/api/tasks/{t['id']}/start", headers=member)
+    client.post(f"/api/tasks/{t['id']}/submit", headers=member, json={"note": "done"})
+    client.post(f"/api/tasks/{t['id']}/review", headers=admin, json={"approve": True})
+
+
+def test_completed_at_set_when_entering_final_column(client, world):
+    sup = auth_header(client, "super", "pw")
+    done = world["cols"]["done"]
+    client.put(f"/api/columns/{done.id}", headers=sup, json={"is_final": True})
+
+    t = _assigned_task(client, world)
+    # before completion: no completion time
+    assert client.get(f"/api/tasks/{t['id']}", headers=sup).json()["completed_at"] is None
+
+    _drive_to_done(client, world, t)  # review-approve lands the card in the final column
+    assert client.get(f"/api/tasks/{t['id']}", headers=sup).json()["completed_at"] is not None
+
+
+def test_completed_at_not_set_when_done_column_is_not_final(client, world):
+    # 口径 A: only the is_final column stamps completion. A plain done column doesn't.
+    sup = auth_header(client, "super", "pw")
+    t = _assigned_task(client, world)
+    _drive_to_done(client, world, t)  # done column is NOT marked is_final
+    assert client.get(f"/api/tasks/{t['id']}", headers=sup).json()["completed_at"] is None
+
+
+def test_completed_at_persists_on_leave_and_refreshes_on_reenter(client, db, world):
+    from datetime import timedelta
+
+    from app.models import Task
+
+    sup = auth_header(client, "super", "pw")
+    admin = auth_header(client, "admin", "pw")
+    done = world["cols"]["done"]
+    client.put(f"/api/columns/{done.id}", headers=sup, json={"is_final": True})
+
+    t = _assigned_task(client, world)
+    _drive_to_done(client, world, t)
+    task = db.get(Task, t["id"])
+    db.refresh(task)
+    first = task.completed_at
+    assert first is not None
+
+    # backdate it so a fresh stamp is strictly newer
+    task.completed_at = first - timedelta(days=5)
+    db.commit()
+    backdated = task.completed_at
+
+    # move OUT of the final column -> completed_at is NOT cleared
+    client.post(
+        f"/api/tasks/{t['id']}/move", headers=admin, json={"column_id": world["cols"]["doing"].id}
+    )
+    db.refresh(task)
+    assert task.completed_at == backdated
+
+    # move BACK into the final column -> completed_at refreshes to now
+    client.post(f"/api/tasks/{t['id']}/move", headers=admin, json={"column_id": done.id})
+    db.refresh(task)
+    assert task.completed_at > backdated
+
+
 def test_update_task_title(client, world):
     admin = auth_header(client, "admin", "pw")
     t = _assigned_task(client, world)

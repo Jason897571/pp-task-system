@@ -36,25 +36,34 @@ completed_at = Column(DateTime, nullable=True)  # 进入最终验收列(is_final
 
 ### 写入逻辑
 
-新增 helper（放在 `services.py`），在任何把卡片 `column_id` 改成新列、且**列真正发生变化**时调用；若新列 `is_final` 为真则写入当前时间：
+新增 helper（放在 `services.py`），在把卡片 `column_id` 改成新列时调用；仅当新列 `is_final` 为真、且**相对原来的列真正发生了变化**时写入当前时间（UTC naive，与 `archived_at` 一致）：
 
 ```python
-def stamp_completion(task, new_column):
-    if new_column and new_column.is_final:
-        task.completed_at = <now, UTC naive>
+def stamp_completion(task, new_col, prev_col_id):
+    if new_col is not None and new_col.is_final and new_col.id != prev_col_id:
+        task.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
 ```
 
-接入的落列路径（`backend/app/routers/tasks.py`）：
+调用方式（先记下旧列，再落新列，再打时间戳）：
 
-- `move_task()` — 拖拽移动（column_id 变化时）
-- `approve_task()` — 审批通过落列
-- `move_task_to_board()` — 从归档还原到目标看板
+```python
+prev = task.column_id
+task.column_id = col.id
+stamp_completion(task, col, prev)
+```
+
+接入的落列路径（`backend/app/routers/tasks.py`）——凡是可能把卡片送进 final 列的地方：
+
+- `review_task()` 审批通过 → done 列（若 done 被标记为 is_final）**【主路径】**
+- `submit_task()` 无审核门时 → done 列（若 done 是 is_final）
+- `move_task()` — 拖拽移动到任意列（可能是 final 列）
+- `move_task_to_board()` — 从归档还原到目标看板的某列
 - `restore_to_origin()` — 一键还原到原看板 final 列
 
 不触发的场景：
-- `submit_task()` 进的是 done 列而非 final 列，不触发
-- 周六归档扫描时卡片已在 final 列、时间戳早已写入，无需改动
-- 同列内排序、编辑标题等不改 column_id 的操作不触发
+- `approve_task()` / `start_task()` 落的是 start/doing 列，永远不是 final，不触发（helper 内 is_final 判断天然跳过）
+- 周六归档扫描时卡片已在 final 列、时间戳早已写入；归档列本身不是 is_final，不会误刷
+- 同列内移动、编辑标题等不改 column_id（或改成同一列）的操作不触发
 
 ### 历史回填（Alembic 迁移）
 

@@ -146,6 +146,9 @@ class Task(Base):
     # When the card was swept into the archive board (drives the 归档看板 weekly view).
     # Non-null only while the card lives on the archive board; cleared if restored.
     archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # When the card entered the final-acceptance (is_final) column. Overwritten on
+    # re-entry, kept when leaving. Statistics only (e.g. tasks completed per week).
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
