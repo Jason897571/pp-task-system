@@ -26,6 +26,7 @@ import { CardActions } from './CardActions'
 import { ChecklistsSection } from './ChecklistsSection'
 import { AttachmentsSection, AttachmentList } from './AttachmentsSection'
 import { LinkedTasksSection } from './LinkedTasksSection'
+import { TagsSection } from './TagsSection'
 import { UserAvatar } from './UserAvatar'
 import { dueLabel, dueState, PRIORITY_LABEL, PRIORITY_OPTIONS } from '../lib/badges'
 import { imagesFromClipboard } from '../lib/clipboard'
@@ -481,6 +482,15 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
               <LinkedTasksSection
                 taskId={task.id}
                 links={task.links}
+                canEdit={canEdit}
+                onChanged={invalidate}
+              />
+            )}
+
+            {(canEdit || task.tags.length > 0) && (
+              <TagsSection
+                taskId={task.id}
+                tags={task.tags}
                 canEdit={canEdit}
                 onChanged={invalidate}
               />

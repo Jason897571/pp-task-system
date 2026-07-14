@@ -83,6 +83,7 @@ export interface Tag {
   id: number
   name: string
   color: TagColor
+  link: string | null // optional URL; clicking the tag on a card opens it
 }
 
 export interface ChecklistStats {

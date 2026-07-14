@@ -6,6 +6,7 @@ import {
   Form,
   Input,
   Modal,
+  Popconfirm,
   Select,
   Spin,
   Switch,
@@ -16,16 +17,185 @@ import {
 } from 'antd'
 import {
   createDepartment,
+  createTag,
   createUser,
+  deleteTag,
   getAdminUsers,
   getDepartments,
+  getTags,
   getVisibilityMatrix,
   resolveFeishu,
   setBoardMemberVisibility,
+  updateTag,
   updateUser,
 } from '../api/endpoints'
 import { errMessage } from '../api/client'
-import type { AdminUser, CreatedUser, CreateUserBody, Role } from '../api/types'
+import type { AdminUser, CreatedUser, CreateUserBody, Role, Tag, TagColor } from '../api/types'
+import { TAG_COLORS, TAG_COLOR_KEYS } from '../lib/badges'
+
+const colorOptions = TAG_COLOR_KEYS.map((c) => ({
+  value: c,
+  label: (
+    <span
+      style={{ display: 'inline-block', width: 44, height: 12, borderRadius: 3, background: TAG_COLORS[c] }}
+    />
+  ),
+}))
+
+function TagsTab() {
+  const qc = useQueryClient()
+  const { message } = AntApp.useApp()
+  const { data: tags = [] } = useQuery({ queryKey: ['tags'], queryFn: getTags })
+
+  const [name, setName] = useState('')
+  const [color, setColor] = useState<TagColor>(TAG_COLOR_KEYS[0])
+  const [link, setLink] = useState('')
+  const [editing, setEditing] = useState<Tag | null>(null)
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['tags'] })
+
+  const addM = useMutation({
+    mutationFn: () => createTag({ name: name.trim(), color, link: link.trim() || null }),
+    onSuccess: () => {
+      setName('')
+      setLink('')
+      message.success('已创建标签')
+      invalidate()
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
+
+  const editM = useMutation({
+    mutationFn: (body: { id: number; name: string; color: TagColor; link: string | null }) =>
+      updateTag(body.id, { name: body.name, color: body.color, link: body.link }),
+    onSuccess: () => {
+      setEditing(null)
+      message.success('已更新标签')
+      invalidate()
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
+
+  const delM = useMutation({
+    mutationFn: (id: number) => deleteTag(id),
+    onSuccess: () => {
+      message.success('已删除标签')
+      invalidate()
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Input
+          placeholder="标签名"
+          style={{ width: 140 }}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Select style={{ width: 70 }} value={color} onChange={setColor} options={colorOptions} />
+        <Input
+          placeholder="链接 https://…（可选）"
+          style={{ width: 280 }}
+          value={link}
+          onChange={(e) => setLink(e.target.value)}
+        />
+        <Button type="primary" disabled={!name.trim()} onClick={() => addM.mutate()}>
+          新建标签
+        </Button>
+      </div>
+      <Table
+        rowKey="id"
+        pagination={false}
+        dataSource={tags}
+        columns={[
+          {
+            title: '标签',
+            key: 'name',
+            render: (_: unknown, t: Tag) => (
+              <span
+                className="tag-chip"
+                style={{ background: TAG_COLORS[t.color], cursor: 'default' }}
+              >
+                {t.name}
+              </span>
+            ),
+          },
+          {
+            title: '链接',
+            key: 'link',
+            render: (_: unknown, t: Tag) =>
+              t.link ? (
+                <a href={t.link} target="_blank" rel="noreferrer">
+                  {t.link}
+                </a>
+              ) : (
+                <span style={{ color: '#8c9bab' }}>—</span>
+              ),
+          },
+          {
+            title: '操作',
+            key: 'ops',
+            width: 140,
+            render: (_: unknown, t: Tag) => (
+              <span style={{ display: 'flex', gap: 8 }}>
+                <Button size="small" onClick={() => setEditing(t)}>
+                  编辑
+                </Button>
+                <Popconfirm
+                  title="删除该标签？"
+                  description="会从所有任务上移除该标签"
+                  onConfirm={() => delM.mutate(t.id)}
+                >
+                  <Button size="small" danger>
+                    删除
+                  </Button>
+                </Popconfirm>
+              </span>
+            ),
+          },
+        ]}
+      />
+
+      <Modal
+        open={editing !== null}
+        title="编辑标签"
+        onCancel={() => setEditing(null)}
+        onOk={() =>
+          editing &&
+          editM.mutate({
+            id: editing.id,
+            name: editing.name.trim(),
+            color: editing.color,
+            link: editing.link?.trim() || null,
+          })
+        }
+        okButtonProps={{ disabled: !editing?.name.trim(), loading: editM.isPending }}
+      >
+        {editing && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Input
+              placeholder="标签名"
+              value={editing.name}
+              onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+            />
+            <Select
+              value={editing.color}
+              onChange={(c) => setEditing({ ...editing, color: c })}
+              options={colorOptions}
+            />
+            <Input
+              placeholder="链接 https://…（留空表示无链接）"
+              value={editing.link ?? ''}
+              onChange={(e) => setEditing({ ...editing, link: e.target.value })}
+            />
+          </div>
+        )}
+      </Modal>
+    </div>
+  )
+}
 
 function DepartmentsTab() {
   const qc = useQueryClient()
@@ -402,6 +572,7 @@ export function AdminPage() {
         items={[
           { key: 'users', label: '用户', children: <UsersTab /> },
           { key: 'departments', label: '部门', children: <DepartmentsTab /> },
+          { key: 'tags', label: '标签', children: <TagsTab /> },
           { key: 'visibility', label: '看板可见性', children: <VisibilityTab /> },
         ]}
       />

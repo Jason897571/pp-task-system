@@ -1,5 +1,5 @@
 import type { ColumnKind, Task } from '../api/types'
-import { dueLabel, dueState, PRIORITY_LABEL } from '../lib/badges'
+import { dueLabel, dueState, openTagLink, PRIORITY_LABEL, TAG_COLORS } from '../lib/badges'
 import { UserAvatar } from './UserAvatar'
 
 // Card front (spec §7.3). Layout: colored label pills → title → hairline
@@ -70,6 +70,30 @@ export function CardFront({
 
   return (
     <>
+      {task.tags.length > 0 && (
+        <div className="card-tags">
+          {task.tags.map((t) => (
+            <span
+              key={t.id}
+              className="tag-chip"
+              style={{ background: TAG_COLORS[t.color], cursor: t.link ? 'pointer' : 'default' }}
+              title={t.link ? `打开链接：${t.link}` : t.name}
+              onClick={
+                t.link
+                  ? (e) => {
+                      // Don't let the click bubble to the card (which opens the detail modal).
+                      e.stopPropagation()
+                      openTagLink(t)
+                    }
+                  : undefined
+              }
+            >
+              {t.name}
+              {t.link && ' 🔗'}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="card-no" title="任务编号">#{task.id}</div>
       <div className="card-title">{task.title}</div>
       {(chips.length > 0 || task.assignee) && (

@@ -1,4 +1,10 @@
-import type { ColumnKind, TagColor } from '../api/types'
+import type { ColumnKind, Tag, TagColor } from '../api/types'
+
+// Open a tag's link in a new tab, if it has one. Used on the board card face and
+// in the detail modal so clicking a linked tag jumps to its URL.
+export function openTagLink(tag: Tag): void {
+  if (tag.link) window.open(tag.link, '_blank', 'noopener')
+}
 
 // 9-color label palette (spec §标签). Keys match the backend `color` field.
 export const TAG_COLORS: Record<TagColor, string> = {

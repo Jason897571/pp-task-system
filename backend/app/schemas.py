@@ -61,6 +61,7 @@ class TagOut(BaseModel):
     id: int
     name: str
     color: str
+    link: str | None = None
 
 
 class ChecklistStats(BaseModel):
@@ -349,6 +350,13 @@ class LinkIn(BaseModel):
 class TagIn(BaseModel):
     name: str
     color: str
+    link: str | None = None
+
+
+class TagUpdateIn(BaseModel):
+    name: str | None = None
+    color: str | None = None
+    link: str | None = None
 
 
 class TaskTagsIn(BaseModel):

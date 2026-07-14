@@ -206,8 +206,16 @@ export const resolveFeishu = () =>
 // --- Tags ---
 export const getTags = () => api.get<Tag[]>('/tags').then((r) => r.data)
 
-export const createTag = (body: { name: string; color: TagColor }) =>
+export const createTag = (body: { name: string; color: TagColor; link?: string | null }) =>
   api.post<Tag>('/tags', body).then((r) => r.data)
+
+export const updateTag = (
+  id: number,
+  body: { name?: string; color?: TagColor; link?: string | null },
+) => api.put<Tag>(`/tags/${id}`, body).then((r) => r.data)
+
+export const deleteTag = (id: number) =>
+  api.delete<{ ok: boolean }>(`/tags/${id}`).then((r) => r.data)
 
 export const setTaskTags = (taskId: number, tag_ids: number[]) =>
   api.put<Tag[]>(`/tasks/${taskId}/tags`, { tag_ids }).then((r) => r.data)

@@ -33,26 +33,82 @@ def _assigned_task(client, world, assignee_key="member"):
 
 
 def test_create_and_list_tags(client, world):
-    h = auth_header(client, "member", "pw")
-    r = client.post("/api/tags", headers=h, json={"name": "紧急", "color": "red"})
+    # Tags are created by super_admin (in the 标签 management page); a link is optional.
+    sup = auth_header(client, "super", "pw")
+    r = client.post(
+        "/api/tags",
+        headers=sup,
+        json={"name": "紧急", "color": "red", "link": "https://wiki.example.com/urgent"},
+    )
     assert r.status_code == 200
     assert r.json()["color"] == "red"
+    assert r.json()["link"] == "https://wiki.example.com/urgent"
 
-    listing = client.get("/api/tags", headers=h).json()
-    assert any(t["name"] == "紧急" for t in listing)
+    # any logged-in user can read the palette
+    listing = client.get("/api/tags", headers=auth_header(client, "member", "pw")).json()
+    row = next(t for t in listing if t["name"] == "紧急")
+    assert row["link"] == "https://wiki.example.com/urgent"
+
+
+def test_only_super_admin_creates_tags(client, world):
+    assert client.post(
+        "/api/tags", headers=auth_header(client, "member", "pw"), json={"name": "x", "color": "red"}
+    ).status_code == 403
+    assert client.post(
+        "/api/tags", headers=auth_header(client, "admin", "pw"), json={"name": "x", "color": "red"}
+    ).status_code == 403
 
 
 def test_create_tag_bad_color(client, world):
-    h = auth_header(client, "member", "pw")
-    r = client.post("/api/tags", headers=h, json={"name": "x", "color": "rainbow"})
+    sup = auth_header(client, "super", "pw")
+    r = client.post("/api/tags", headers=sup, json={"name": "x", "color": "rainbow"})
     assert r.status_code == 400
 
 
+def test_create_tag_rejects_non_http_link(client, world):
+    sup = auth_header(client, "super", "pw")
+    r = client.post(
+        "/api/tags", headers=sup, json={"name": "x", "color": "red", "link": "javascript:alert(1)"}
+    )
+    assert r.status_code == 400
+
+
+def test_update_and_delete_tag(client, world):
+    sup = auth_header(client, "super", "pw")
+    admin = auth_header(client, "admin", "pw")
+    tag = client.post("/api/tags", headers=sup, json={"name": "旧名", "color": "blue"}).json()
+    assert tag["link"] is None
+
+    # update name / color / link
+    r = client.put(
+        f"/api/tags/{tag['id']}",
+        headers=sup,
+        json={"name": "新名", "color": "green", "link": "https://x.example.com"},
+    )
+    assert r.status_code == 200
+    assert r.json()["name"] == "新名"
+    assert r.json()["color"] == "green"
+    assert r.json()["link"] == "https://x.example.com"
+
+    # a manager cannot update or delete tags
+    assert client.put(f"/api/tags/{tag['id']}", headers=admin, json={"name": "z"}).status_code == 403
+    assert client.delete(f"/api/tags/{tag['id']}", headers=admin).status_code == 403
+
+    # attach the tag to a task, then delete it -> also removed from the task
+    t = _assigned_task(client, world)
+    client.put(f"/api/tasks/{t['id']}/tags", headers=admin, json={"tag_ids": [tag["id"]]})
+    assert client.delete(f"/api/tags/{tag['id']}", headers=sup).status_code == 200
+    detail = client.get(f"/api/tasks/{t['id']}", headers=admin).json()
+    assert detail["tags"] == []
+    assert all(x["id"] != tag["id"] for x in client.get("/api/tags", headers=sup).json())
+
+
 def test_set_task_tags_and_serialization(client, world):
+    sup = auth_header(client, "super", "pw")
     admin = auth_header(client, "admin", "pw")
     t = _assigned_task(client, world)
-    tag1 = client.post("/api/tags", headers=admin, json={"name": "A", "color": "blue"}).json()
-    tag2 = client.post("/api/tags", headers=admin, json={"name": "B", "color": "gray"}).json()
+    tag1 = client.post("/api/tags", headers=sup, json={"name": "A", "color": "blue"}).json()
+    tag2 = client.post("/api/tags", headers=sup, json={"name": "B", "color": "gray"}).json()
 
     r = client.put(
         f"/api/tasks/{t['id']}/tags", headers=admin, json={"tag_ids": [tag1["id"], tag2["id"]]}
@@ -78,7 +134,9 @@ def test_assignee_can_set_tags_other_member_cannot(client, world):
     member = auth_header(client, "member", "pw")
     member2 = auth_header(client, "member2", "pw")
     t = _assigned_task(client, world, "member")
-    tag = client.post("/api/tags", headers=admin, json={"name": "T", "color": "pink"}).json()
+    tag = client.post(
+        "/api/tags", headers=auth_header(client, "super", "pw"), json={"name": "T", "color": "pink"}
+    ).json()
 
     assert client.put(
         f"/api/tasks/{t['id']}/tags", headers=member, json={"tag_ids": [tag["id"]]}

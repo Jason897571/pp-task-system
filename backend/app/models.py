@@ -263,6 +263,8 @@ class Tag(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(50))
     color: Mapped[str] = mapped_column(String(20))
+    # Optional URL; clicking the tag on a card opens it in a new tab.
+    link: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
 class TaskTag(Base):
