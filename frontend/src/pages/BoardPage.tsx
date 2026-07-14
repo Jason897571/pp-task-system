@@ -49,9 +49,15 @@ export function BoardPage() {
   const boardId = boardIdParam ? Number(boardIdParam) : boards[0]?.id
   useEffect(() => {
     if (!boardIdParam && boards.length > 0) {
-      navigate(`/board/${boards[0].id}`, { replace: true })
+      // Preserve a deep-linked card (/board/card/:taskId) when filling in the
+      // default board, otherwise the redirect would drop the task and just show
+      // the board.
+      const dest = taskIdParam
+        ? `/board/${boards[0].id}/card/${taskIdParam}`
+        : `/board/${boards[0].id}`
+      navigate(dest, { replace: true })
     }
-  }, [boardIdParam, boards, navigate])
+  }, [boardIdParam, taskIdParam, boards, navigate])
 
   const board = boards.find((b) => b.id === boardId)
   const isSuperAdmin = user?.role === 'super_admin'

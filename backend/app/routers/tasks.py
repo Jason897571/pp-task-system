@@ -83,7 +83,7 @@ def _feishu_task_card(
         assignee_open_id=mention.feishu_open_id if mention else None,
         assignee_name=mention.full_name if mention else None,
         extra=extra,
-        link_url=f"{settings.app_base_url.rstrip('/')}/board/card/{task.id}",
+        link_url=f"{settings.app_base_url.rstrip('/')}/board/{task.board_id}/card/{task.id}",
     )
     post_bot_card(settings.feishu_bot_webhook, card)
 
