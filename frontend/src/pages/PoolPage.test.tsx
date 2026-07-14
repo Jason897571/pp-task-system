@@ -28,6 +28,7 @@ vi.mock('../api/endpoints', () => ({
         due_date: null,
         deleted_at: null,
         archived_at: null,
+        completed_at: null,
         created_at: '',
         updated_at: '',
         tags: [],

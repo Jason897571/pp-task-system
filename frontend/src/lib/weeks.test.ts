@@ -19,6 +19,7 @@ function task(id: number, archived_at: string | null): Task {
     due_date: null,
     deleted_at: null,
     archived_at,
+    completed_at: null,
     created_at: '2026-06-01T00:00:00',
     updated_at: '2026-06-01T00:00:00',
     tags: [],
