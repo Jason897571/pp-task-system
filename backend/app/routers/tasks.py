@@ -338,9 +338,14 @@ def approve_task(
     if not body.approve:
         task.lifecycle = "declined"
         task.column_id = None
+        # A rejected self-submission is moved to the recycle bin (recoverable),
+        # so it isn't silently lost, and its creator is told why.
+        task.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None)
         log_activity(db, task, user, "rejected")
+        notify(db, task.creator_id, "rejected", f"你提交的需求「{task.title}」未通过审批", task.id)
         db.commit()
         db.refresh(task)
+        _feishu_task_card(task, task.creator, "🚫 需求被拒绝", f"审批人：{_name(user)}")
         return serialize_task(db, task)
 
     if body.assignee_id is None:
@@ -781,6 +786,10 @@ def restore_task(
     if not admin_can_touch_task(user, task):
         raise HTTPException(status_code=403, detail="无权恢复该任务")
     task.deleted_at = None
+    # A rejected task was trashed on decline; restoring it puts it back in the
+    # approval queue instead of leaving it in the invisible "declined" state.
+    if task.lifecycle == "declined":
+        task.lifecycle = "pending_approval"
     db.commit()
     db.refresh(task)
     return serialize_task(db, task)

@@ -492,6 +492,46 @@ def test_self_submit_decline(client, world):
     assert r.json()["lifecycle"] == "declined"
 
 
+def test_declined_task_goes_to_trash_and_notifies_creator(client, world):
+    member = auth_header(client, "member", "pw")
+    admin = auth_header(client, "admin", "pw")
+    t = client.post(
+        "/api/tasks", headers=member, json={"title": "被拒需求", "board_id": world["board"].id}
+    ).json()
+
+    r = client.post(f"/api/tasks/{t['id']}/approve", headers=admin, json={"approve": False})
+    assert r.status_code == 200
+    assert r.json()["lifecycle"] == "declined"
+    assert r.json()["deleted_at"] is not None
+
+    # gone from the pending queue
+    pending = client.get("/api/tasks?lifecycle=pending_approval", headers=admin).json()
+    assert all(x["id"] != t["id"] for x in pending)
+    # but recoverable from the recycle bin (not silently lost)
+    trash = client.get("/api/trash", headers=admin).json()
+    assert any(x["id"] == t["id"] for x in trash)
+    # creator is notified their requirement was rejected
+    notifs = client.get("/api/notifications", headers=member).json()
+    assert any(n["type"] == "rejected" and "被拒需求" in n["message"] for n in notifs)
+
+
+def test_restore_declined_task_returns_to_pending(client, world):
+    member = auth_header(client, "member", "pw")
+    admin = auth_header(client, "admin", "pw")
+    t = client.post(
+        "/api/tasks", headers=member, json={"title": "拒后恢复", "board_id": world["board"].id}
+    ).json()
+    client.post(f"/api/tasks/{t['id']}/approve", headers=admin, json={"approve": False})
+
+    r = client.post(f"/api/tasks/{t['id']}/restore", headers=admin)
+    assert r.status_code == 200
+    # a restored rejected task must not vanish again -> back to the approval queue
+    assert r.json()["deleted_at"] is None
+    assert r.json()["lifecycle"] == "pending_approval"
+    pending = client.get("/api/tasks?lifecycle=pending_approval", headers=admin).json()
+    assert any(x["id"] == t["id"] for x in pending)
+
+
 def test_approve_without_assignee_is_400(client, world):
     member = auth_header(client, "member", "pw")
     admin = auth_header(client, "admin", "pw")
