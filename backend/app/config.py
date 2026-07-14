@@ -15,6 +15,9 @@ class Settings:
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))
     cors_origin: str = os.getenv("CORS_ORIGIN", "http://localhost:5173")
+    # Public web origin, used to build task deep-links in Feishu cards.
+    # Defaults to CORS_ORIGIN (the public web origin in this deployment).
+    app_base_url: str = os.getenv("APP_BASE_URL", os.getenv("CORS_ORIGIN", "http://localhost:5173"))
 
     # Feishu (Lark) bitable sync — defaults target the project's 任务总表.
     feishu_app_id: str = os.getenv("FEISHU_APP_ID", "cli_a92c47b3a038dbb6")

@@ -77,3 +77,36 @@ def test_card_truncates_long_detail():
     body = _body(_card(description="x" * 300))
     assert "…" in body
     assert "x" * 300 not in body
+
+
+def test_card_extra_line_is_appended_to_body():
+    body = _body(_card(extra="**💬 评论**　改一下配色"))
+    assert "改一下配色" in body
+
+
+def test_card_extra_omitted_by_default():
+    # no extra passed -> no stray label
+    assert "评论" not in _body(_card())
+
+
+def _actions(card):
+    for el in card["elements"]:
+        if el.get("tag") == "action":
+            return el["actions"]
+    return None
+
+
+def test_card_renders_a_task_button_linking_to_url():
+    card = _card(link_url="http://host:8080/board/card/132")
+    actions = _actions(card)
+    assert actions is not None
+    btn = actions[0]
+    assert btn["tag"] == "button"
+    assert btn["url"] == "http://host:8080/board/card/132"
+    assert "任务" in btn["text"]["content"]
+    # the raw URL must NOT appear in the card body (button only)
+    assert "http://host:8080/board/card/132" not in _body(card)
+
+
+def test_card_has_no_action_when_no_link():
+    assert _actions(_card(link_url=None)) is None

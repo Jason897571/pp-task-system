@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user, require_admin
-from app.feishu import build_task_card, post_bot_card, post_bot_webhook
+from app.feishu import build_task_card, post_bot_card
 from app.models import (
     Board,
     BoardColumn,
@@ -58,11 +58,6 @@ from app.services import (
 router = APIRouter(prefix="/api", tags=["tasks"])
 
 
-def _feishu(text: str) -> None:
-    """Post a plain-text task notification to the group bot (best-effort)."""
-    post_bot_webhook(settings.feishu_bot_webhook, text)
-
-
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 
@@ -73,8 +68,11 @@ def _due_text(task: Task) -> str | None:
     return task.due_date.replace(tzinfo=timezone.utc).astimezone(_SHANGHAI).strftime("%Y-%m-%d")
 
 
-def _feishu_task_card(task: Task, assignee: User | None, header: str, footer: str) -> None:
-    """Post an assignment card (title / DDL / priority / detail) to the group bot."""
+def _feishu_task_card(
+    task: Task, mention: User | None, header: str, footer: str, extra: str | None = None
+) -> None:
+    """Post a task card (title / DDL / priority / detail, @-mentioning `mention`)
+    to the group bot. `extra` appends one more body line (e.g. a comment)."""
     card = build_task_card(
         header=header,
         footer=footer,
@@ -82,24 +80,16 @@ def _feishu_task_card(task: Task, assignee: User | None, header: str, footer: st
         priority=task.priority,
         due_date=_due_text(task),
         description=task.description,
-        assignee_open_id=assignee.feishu_open_id if assignee else None,
-        assignee_name=assignee.full_name if assignee else None,
+        assignee_open_id=mention.feishu_open_id if mention else None,
+        assignee_name=mention.full_name if mention else None,
+        extra=extra,
+        link_url=f"{settings.app_base_url.rstrip('/')}/board/card/{task.id}",
     )
     post_bot_card(settings.feishu_bot_webhook, card)
 
 
 def _name(user: User | None) -> str:
     return user.full_name if user else "某人"
-
-
-def _at(user: User | None) -> str:
-    """Feishu @-fragment: a real <at> when we have the user's open_id, else the
-    plain-text @name fallback (visible in the group but not a hard ping)."""
-    if user is None:
-        return "@某人"
-    if user.feishu_open_id:
-        return f'<at user_id="{user.feishu_open_id}">{user.full_name}</at>'
-    return f"@{user.full_name}"
 
 
 def _column_kind(db: Session, task: Task) -> str | None:
@@ -540,10 +530,7 @@ def submit_task(
     db.commit()
     db.refresh(task)
     if review is not None:
-        _feishu(
-            f"🔍 {_at(task.creator)}，任务「{task.title}」已提交完成，需要你 review"
-            f"（提交人：{_name(user)}）"
-        )
+        _feishu_task_card(task, task.creator, "🔍 待审核", f"提交人：{_name(user)}")
     return serialize_task(db, task)
 
 
@@ -635,8 +622,8 @@ def comment_task(
     db.refresh(act)
     if assignee is not None and assignee.id != user.id:
         snippet = text if len(text) <= 100 else text[:100] + "…"
-        _feishu(
-            f"💬 {_at(assignee)}，任务「{task.title}」收到来自 {_name(user)} 的评论：{snippet}"
+        _feishu_task_card(
+            task, assignee, "💬 新评论", f"评论人：{_name(user)}", extra=f"**💬 评论**　{snippet}"
         )
     return CommentOut(
         id=act.id,

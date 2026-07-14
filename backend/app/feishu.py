@@ -69,13 +69,17 @@ def build_task_card(
     description: str | None = None,
     assignee_open_id: str | None = None,
     assignee_name: str | None = None,
+    extra: str | None = None,
+    link_url: str | None = None,
 ) -> dict:
-    """Build a Feishu interactive card for a task-assignment notification.
+    """Build a Feishu interactive card for a task notification.
 
     Pure function: `due_date` is a pre-formatted string (caller handles timezone),
     `description` is truncated here. @-mentions the assignee via <at id=...> when an
     open_id is known, else a plain @name; when neither is given (unassigned task)
-    no mention line is shown."""
+    no mention line is shown. `extra` is an optional pre-formatted body line
+    appended last (e.g. a comment excerpt). `link_url`, if given, adds a "查看任务"
+    button that opens the task (the raw URL is not shown in the body)."""
     badge, color = _PRIORITY_CARD.get(priority, (priority, "blue"))
 
     lines: list[str] = []
@@ -91,15 +95,33 @@ def build_task_card(
         if len(detail) > _DETAIL_MAX:
             detail = detail[:_DETAIL_MAX] + "…"
         lines.append(f"**📄 详情**　{detail}")
+    if extra:
+        lines.append(extra)
+
+    elements: list[dict] = [
+        {"tag": "div", "text": {"tag": "lark_md", "content": "\n".join(lines)}},
+    ]
+    if link_url:
+        elements.append(
+            {
+                "tag": "action",
+                "actions": [
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "🔗 查看任务"},
+                        "type": "primary",
+                        "url": link_url,
+                    }
+                ],
+            }
+        )
+    elements.append({"tag": "hr"})
+    elements.append({"tag": "note", "elements": [{"tag": "plain_text", "content": footer}]})
 
     return {
         "config": {"wide_screen_mode": True},
         "header": {"template": color, "title": {"tag": "plain_text", "content": header}},
-        "elements": [
-            {"tag": "div", "text": {"tag": "lark_md", "content": "\n".join(lines)}},
-            {"tag": "hr"},
-            {"tag": "note", "elements": [{"tag": "plain_text", "content": footer}]},
-        ],
+        "elements": elements,
     }
 
 # Field types we use (Feishu bitable field type ids).
