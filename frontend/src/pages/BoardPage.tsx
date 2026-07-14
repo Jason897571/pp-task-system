@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   DndContext,
@@ -8,7 +8,7 @@ import {
 } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Empty, Segmented, Spin, App as AntApp } from 'antd'
+import { Button, Empty, Segmented, Select, Spin, App as AntApp } from 'antd'
 import {
   archiveNow,
   createColumn,
@@ -27,7 +27,7 @@ import { errMessage } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { BoardColumnView } from '../components/BoardColumn'
 import { DuplicateModal } from '../components/DuplicateModal'
-import { PRIORITY_RANK } from '../lib/badges'
+import { PRIORITY_RANK, TAG_COLORS } from '../lib/badges'
 import { CardDetailModal } from '../components/CardDetailModal'
 import { CardFront } from '../components/TaskCard'
 import { groupByWeek } from '../lib/weeks'
@@ -66,6 +66,9 @@ export function BoardPage() {
   const [copyTask, setCopyTask] = useState<Task | null>(null)
   // admin/super: toggle between everyone's cards and only my own on this board.
   const [mineOnly, setMineOnly] = useState(false)
+  // Filter the board by tag (ids). Reset when switching boards.
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([])
+  useEffect(() => setSelectedTagIds([]), [boardId])
   // archive board only: group cards by source board (default) or by archive week.
   const [archiveView, setArchiveView] = useState<'source' | 'week'>(() =>
     localStorage.getItem('archiveView') === 'week' ? 'week' : 'source',
@@ -233,6 +236,14 @@ export function BoardPage() {
 
   const sorted = [...columns].sort((a, b) => a.position - b.position)
 
+  // Distinct tags that actually appear on this board's cards (drives the filter;
+  // the filter only shows when at least one card is tagged).
+  const boardTags = useMemo(() => {
+    const seen = new Map<number, Task['tags'][number]>()
+    tasks.forEach((t) => t.tags.forEach((tag) => seen.set(tag.id, tag)))
+    return [...seen.values()]
+  }, [tasks])
+
   // Top-bar search (?q=) filters the current board's cards by title or assignee.
   const matchesSearch = (t: Task) =>
     !q ||
@@ -240,7 +251,12 @@ export function BoardPage() {
     (t.assignee?.full_name.toLowerCase().includes(q) ?? false)
   // "我的" scope (admin/super) keeps only cards assigned to the current user.
   const inScope = (t: Task) => !mineOnly || t.assignee?.id === user?.id
-  const visibleTasks = tasks.filter((t) => inScope(t) && matchesSearch(t))
+  // Tag filter: a card matches when it carries ANY of the selected tags (OR).
+  const matchesTags = (t: Task) =>
+    selectedTagIds.length === 0 || t.tags.some((tag) => selectedTagIds.includes(tag.id))
+  const visibleTasks = tasks.filter(
+    (t) => inScope(t) && matchesSearch(t) && matchesTags(t),
+  )
 
   // Cards within a column always sort by priority (P0 → P1 → P2); same priority
   // keeps its original order (stable). Memoized per column at render time below.
@@ -258,9 +274,9 @@ export function BoardPage() {
         <span className="title">
           {board ? `${isArchive ? '🗄️' : board.icon || '📋'} ${board.name}` : '看板'}
         </span>
-        {q && (
+        {(q || selectedTagIds.length > 0) && (
           <span style={{ fontSize: 13, color: '#aab2c8', fontWeight: 500 }}>
-            🔍 “{q}” · 命中 {visibleTasks.length} 张卡
+            🔍 {q ? `“${q}” · ` : '标签筛选 · '}命中 {visibleTasks.length} 张卡
           </span>
         )}
         <span style={{ flex: 1 }} />
@@ -282,6 +298,35 @@ export function BoardPage() {
               { label: '按来源看板', value: 'source' },
               { label: '按周', value: 'week' },
             ]}
+          />
+        )}
+        {!isArchive && boardTags.length > 0 && (
+          <Select
+            mode="multiple"
+            allowClear
+            size="small"
+            placeholder="🏷 按标签筛选"
+            style={{ minWidth: 180, maxWidth: 320 }}
+            value={selectedTagIds}
+            onChange={setSelectedTagIds}
+            maxTagCount="responsive"
+            options={boardTags.map((t) => ({
+              value: t.id,
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 3,
+                      background: TAG_COLORS[t.color],
+                      display: 'inline-block',
+                    }}
+                  />
+                  {t.name}
+                </span>
+              ),
+            }))}
           />
         )}
         {isManager && (
