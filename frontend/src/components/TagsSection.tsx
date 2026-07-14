@@ -49,15 +49,26 @@ export function TagsSection({ taskId, tags, canEdit, onChanged }: Props) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
         {tags.length === 0 && <span className="cd-empty">暂无标签</span>}
         {tags.map((t) => (
-          <span
-            key={t.id}
-            className="tag-chip"
-            style={{ background: TAG_COLORS[t.color], cursor: t.link ? 'pointer' : 'default' }}
-            onClick={() => openTagLink(t)}
-            title={t.link ? `打开链接：${t.link}` : t.name}
-          >
-            {t.name}
-            {t.link && ' 🔗'}
+          <span key={t.id} className="tag-chip" style={{ background: TAG_COLORS[t.color] }}>
+            <span
+              onClick={() => openTagLink(t)}
+              style={{ cursor: t.link ? 'pointer' : 'default' }}
+              title={t.link ? `打开链接：${t.link}` : t.name}
+            >
+              {t.name}
+              {t.link && ' 🔗'}
+            </span>
+            {canEdit && (
+              <button
+                type="button"
+                className="tag-x"
+                title="移除标签"
+                aria-label={`移除标签 ${t.name}`}
+                onClick={() => toggle(t)}
+              >
+                ×
+              </button>
+            )}
           </span>
         ))}
         {canEdit && (

@@ -1170,13 +1170,34 @@ body {
 .tag-chip {
   height: 22px;
   border-radius: 11px;
-  padding: 0 11px;
+  padding: 0 10px;
   font-size: 12px;
   font-weight: 600;
   color: #15191d;
-  line-height: 22px;
   cursor: pointer;
   box-shadow: inset 0 -1px 0 #00000026;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.tag-chip .tag-x {
+  border: none;
+  background: transparent;
+  color: #15191dbb;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+  margin-right: -3px;
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.tag-chip .tag-x:hover {
+  background: #00000022;
+  color: #15191d;
 }
 .tag-row {
   border-radius: 4px;
