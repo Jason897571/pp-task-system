@@ -26,7 +26,7 @@ class Settings:
     # Group custom-bot webhook for task notifications (@-by-name in text).
     feishu_bot_webhook: str = os.getenv(
         "FEISHU_BOT_WEBHOOK",
-        "https://open.feishu.cn/open-apis/bot/v2/hook/93d692de-8aa3-4023-bfef-5cd166dbfdb3",
+        "https://open.feishu.cn/open-apis/bot/v2/hook/dc803494-77d9-4ef2-8961-bde32d64f126",
     )
 
 
