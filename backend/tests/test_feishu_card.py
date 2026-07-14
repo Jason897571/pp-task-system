@@ -57,6 +57,14 @@ def test_card_falls_back_to_plain_at_when_no_open_id():
     assert "@张三" in body
 
 
+def test_card_has_no_mention_when_no_assignee():
+    body = _body(_card(assignee_open_id=None, assignee_name=None))
+    assert "<at id=" not in body
+    assert "@" not in body
+    # title/priority still render
+    assert "标题" in body and "紧急" in body
+
+
 def test_card_omits_missing_due_and_detail_rows():
     body = _body(_card(due_date=None, description=None))
     assert "DDL" not in body

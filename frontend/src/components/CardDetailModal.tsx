@@ -11,6 +11,7 @@ import {
   deleteTask,
   getAssignableUsers,
   getTask,
+  pushTaskToFeishu,
   reviewTask,
   startTask,
   submitTask,
@@ -94,6 +95,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
   })
   const assignM = useMutation({ mutationFn: (id: number) => assignTask(taskId, id) })
   const toPoolM = useMutation({ mutationFn: () => toPoolTask(taskId) })
+  const pushM = useMutation({ mutationFn: () => pushTaskToFeishu(taskId) })
   const commentM = useMutation({
     mutationFn: async ({ text, files }: { text: string; files: File[] }) => {
       const c = await commentTask(taskId, text)
@@ -482,6 +484,22 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                 canEdit={canEdit}
                 onChanged={invalidate}
               />
+            )}
+
+            {isManager && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+                <Button
+                  loading={pushM.isPending}
+                  onClick={() =>
+                    pushM
+                      .mutateAsync()
+                      .then(() => message.success('已推送到飞书'))
+                      .catch((e) => message.error(errMessage(e)))
+                  }
+                >
+                  📮 推送任务
+                </Button>
+              </div>
             )}
           </div>
 

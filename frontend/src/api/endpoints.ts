@@ -162,6 +162,10 @@ export const toPoolTask = (id: number) =>
 export const approveTask = (id: number, body: { approve: boolean; assignee_id?: number }) =>
   api.post<Task>(`/tasks/${id}/approve`, body).then((r) => r.data)
 
+// Manually push the task as a card to the Feishu group (managers only).
+export const pushTaskToFeishu = (id: number) =>
+  api.post<{ ok: boolean }>(`/tasks/${id}/push-feishu`).then((r) => r.data)
+
 // --- Task pool ---
 // Omit boardId to fetch the pool across all visible boards (一次看全部需求池).
 export const getPool = (boardId?: number) =>

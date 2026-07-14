@@ -68,17 +68,22 @@ def build_task_card(
     due_date: str | None = None,
     description: str | None = None,
     assignee_open_id: str | None = None,
-    assignee_name: str = "某人",
+    assignee_name: str | None = None,
 ) -> dict:
     """Build a Feishu interactive card for a task-assignment notification.
 
     Pure function: `due_date` is a pre-formatted string (caller handles timezone),
     `description` is truncated here. @-mentions the assignee via <at id=...> when an
-    open_id is known, else falls back to a plain @name (visible, no hard ping)."""
+    open_id is known, else a plain @name; when neither is given (unassigned task)
+    no mention line is shown."""
     badge, color = _PRIORITY_CARD.get(priority, (priority, "blue"))
-    mention = f"<at id={assignee_open_id}></at>" if assignee_open_id else f"@{assignee_name}"
 
-    lines = [mention, "", f"**🏷 标题**　{title}", f"**🔥 紧急**　{badge}"]
+    lines: list[str] = []
+    if assignee_open_id:
+        lines += [f"<at id={assignee_open_id}></at>", ""]
+    elif assignee_name:
+        lines += [f"@{assignee_name}", ""]
+    lines += [f"**🏷 标题**　{title}", f"**🔥 紧急**　{badge}"]
     if due_date:
         lines.append(f"**📅 DDL**　{due_date}")
     if description:

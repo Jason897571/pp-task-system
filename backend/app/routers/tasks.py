@@ -83,7 +83,7 @@ def _feishu_task_card(task: Task, assignee: User | None, header: str, footer: st
         due_date=_due_text(task),
         description=task.description,
         assignee_open_id=assignee.feishu_open_id if assignee else None,
-        assignee_name=_name(assignee),
+        assignee_name=assignee.full_name if assignee else None,
     )
     post_bot_card(settings.feishu_bot_webhook, card)
 
@@ -214,8 +214,6 @@ def create_task(
         db.add(task)
     db.commit()
     db.refresh(task)
-    if task.lifecycle == "on_board" and task.assignee is not None:
-        _feishu_task_card(task, task.assignee, "📌 新任务指派", f"指派人：{_name(user)}")
     return serialize_task(db, task)
 
 
@@ -295,8 +293,6 @@ def assign_task(
     notify(db, assignee.id, "assigned", f"你被指派了任务「{task.title}」", task.id)
     db.commit()
     db.refresh(task)
-    header = "📌 任务转派" if is_reassign else "📌 任务指派"
-    _feishu_task_card(task, assignee, header, f"操作人：{_name(user)}")
     return serialize_task(db, task)
 
 
@@ -374,7 +370,6 @@ def approve_task(
     notify(db, assignee.id, "assigned", f"你被指派了任务「{task.title}」", task.id)
     db.commit()
     db.refresh(task)
-    _feishu_task_card(task, assignee, "📌 审批通过并指派", f"审批人：{_name(user)}")
     return serialize_task(db, task)
 
 
@@ -596,6 +591,23 @@ def review_task(
     return serialize_task(db, task)
 
 
+@router.post("/tasks/{task_id}/push-feishu")
+def push_task_to_feishu(
+    task_id: int,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Manually push the task as a card to the Feishu group (managers only).
+    Best-effort: the card is fired in the background, so this always returns ok."""
+    task = db.get(Task, task_id)
+    if task is None or task.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not admin_can_touch_task(user, task):
+        raise HTTPException(status_code=403, detail="无权推送该任务")
+    _feishu_task_card(task, task.assignee, "📌 任务推送", f"推送人：{_name(user)}")
+    return {"ok": True}
+
+
 @router.post("/tasks/{task_id}/comment", response_model=CommentOut)
 def comment_task(
     task_id: int,
@@ -733,7 +745,6 @@ def duplicate_task(
     notify(db, assignee.id, "assigned", f"你被指派了任务「{dst.title}」", dst.id)
     db.commit()
     db.refresh(dst)
-    _feishu_task_card(dst, assignee, "📌 新任务指派", f"指派人：{_name(user)}")
     return serialize_task(db, dst)
 
 
