@@ -133,7 +133,7 @@ export function BoardPage() {
       assigneeId?: number | null
       departmentId?: number | null
     }) => {
-      // member: self-submit -> pending_approval (no assignee choice).
+      // member: adds straight onto the board, assigned to themselves (no approval).
       // admin/super: chosen assignee -> on_board; left empty -> open pool (keeps board info).
       if (user?.role === 'member') return createTask({ title, board_id: boardId! })
       const body: CreateTaskBody = { title, board_id: boardId! }

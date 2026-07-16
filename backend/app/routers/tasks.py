@@ -171,10 +171,13 @@ def create_task(
     )
 
     if user.role == "member":
-        # self-submit -> pending_approval, no column, no assignee
-        task.lifecycle = "pending_approval"
-        task.assignee_id = None
-        task.column_id = None
+        # Members add tasks straight onto the board, assigned to themselves — no approval.
+        col = start_column(db, body.board_id)
+        if col is None:
+            raise HTTPException(status_code=409, detail="看板没有可用的起始列")
+        apply_assignee(task, user)
+        task.lifecycle = "on_board"
+        task.column_id = col.id
     elif body.assignee_id is not None:
         assignee = db.get(User, body.assignee_id)
         if assignee is None:

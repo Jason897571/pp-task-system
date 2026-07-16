@@ -273,12 +273,15 @@ def test_admin_create_without_assignee_goes_open(client, world):
     assert r.json()["column_id"] is None
 
 
-def test_member_create_goes_pending_approval(client, world):
+def test_member_create_goes_on_board_assigned_self(client, world):
+    # Members add tasks straight onto the board (assigned to themselves), no approval.
     h = auth_header(client, "member", "pw")
-    r = client.post("/api/tasks", headers=h, json={"title": "自提", "board_id": world["board"].id})
+    r = client.post("/api/tasks", headers=h, json={"title": "自建", "board_id": world["board"].id})
     assert r.status_code == 200
-    assert r.json()["lifecycle"] == "pending_approval"
-    assert r.json()["assignee"] is None
+    body = r.json()
+    assert body["lifecycle"] == "on_board"
+    assert body["assignee"]["id"] == world["member"].id
+    assert body["column_id"] == world["cols"]["start"].id
 
 
 # --------------------------------------------------------------------------
@@ -463,16 +466,31 @@ def test_member_cannot_move_others_card(client, world):
 # --------------------------------------------------------------------------
 
 
-def test_self_submit_approve(client, world):
-    member = auth_header(client, "member", "pw")
-    admin = auth_header(client, "admin", "pw")
-    t = client.post(
-        "/api/tasks", headers=member, json={"title": "自提通过", "board_id": world["board"].id}
-    ).json()
-    assert t["lifecycle"] == "pending_approval"
+def _pending_task(db, world, title="待审批需求"):
+    """Insert a pending-approval task directly. Members no longer create these via
+    the API (they add straight to the board), but the approval endpoint still
+    handles any legacy pending tasks, so it stays covered."""
+    from app.models import Task
 
+    t = Task(
+        title=title,
+        creator_id=world["member"].id,
+        assignee_id=None,
+        department_id=world["rnd"].id,
+        board_id=world["board"].id,
+        column_id=None,
+        lifecycle="pending_approval",
+    )
+    db.add(t)
+    db.commit()
+    return t
+
+
+def test_self_submit_approve(client, db, world):
+    admin = auth_header(client, "admin", "pw")
+    t = _pending_task(db, world, "自提通过")
     r = client.post(
-        f"/api/tasks/{t['id']}/approve",
+        f"/api/tasks/{t.id}/approve",
         headers=admin,
         json={"approve": True, "assignee_id": world["member"].id},
     )
@@ -481,64 +499,53 @@ def test_self_submit_approve(client, world):
     assert r.json()["column_id"] == world["cols"]["start"].id
 
 
-def test_self_submit_decline(client, world):
-    member = auth_header(client, "member", "pw")
+def test_self_submit_decline(client, db, world):
     admin = auth_header(client, "admin", "pw")
-    t = client.post(
-        "/api/tasks", headers=member, json={"title": "自提拒绝", "board_id": world["board"].id}
-    ).json()
-    r = client.post(f"/api/tasks/{t['id']}/approve", headers=admin, json={"approve": False})
+    t = _pending_task(db, world, "自提拒绝")
+    r = client.post(f"/api/tasks/{t.id}/approve", headers=admin, json={"approve": False})
     assert r.status_code == 200
     assert r.json()["lifecycle"] == "declined"
 
 
-def test_declined_task_goes_to_trash_and_notifies_creator(client, world):
+def test_declined_task_goes_to_trash_and_notifies_creator(client, db, world):
     member = auth_header(client, "member", "pw")
     admin = auth_header(client, "admin", "pw")
-    t = client.post(
-        "/api/tasks", headers=member, json={"title": "被拒需求", "board_id": world["board"].id}
-    ).json()
+    t = _pending_task(db, world, "被拒需求")
 
-    r = client.post(f"/api/tasks/{t['id']}/approve", headers=admin, json={"approve": False})
+    r = client.post(f"/api/tasks/{t.id}/approve", headers=admin, json={"approve": False})
     assert r.status_code == 200
     assert r.json()["lifecycle"] == "declined"
     assert r.json()["deleted_at"] is not None
 
     # gone from the pending queue
     pending = client.get("/api/tasks?lifecycle=pending_approval", headers=admin).json()
-    assert all(x["id"] != t["id"] for x in pending)
+    assert all(x["id"] != t.id for x in pending)
     # but recoverable from the recycle bin (not silently lost)
     trash = client.get("/api/trash", headers=admin).json()
-    assert any(x["id"] == t["id"] for x in trash)
+    assert any(x["id"] == t.id for x in trash)
     # creator is notified their requirement was rejected
     notifs = client.get("/api/notifications", headers=member).json()
     assert any(n["type"] == "rejected" and "被拒需求" in n["message"] for n in notifs)
 
 
-def test_restore_declined_task_returns_to_pending(client, world):
-    member = auth_header(client, "member", "pw")
+def test_restore_declined_task_returns_to_pending(client, db, world):
     admin = auth_header(client, "admin", "pw")
-    t = client.post(
-        "/api/tasks", headers=member, json={"title": "拒后恢复", "board_id": world["board"].id}
-    ).json()
-    client.post(f"/api/tasks/{t['id']}/approve", headers=admin, json={"approve": False})
+    t = _pending_task(db, world, "拒后恢复")
+    client.post(f"/api/tasks/{t.id}/approve", headers=admin, json={"approve": False})
 
-    r = client.post(f"/api/tasks/{t['id']}/restore", headers=admin)
+    r = client.post(f"/api/tasks/{t.id}/restore", headers=admin)
     assert r.status_code == 200
     # a restored rejected task must not vanish again -> back to the approval queue
     assert r.json()["deleted_at"] is None
     assert r.json()["lifecycle"] == "pending_approval"
     pending = client.get("/api/tasks?lifecycle=pending_approval", headers=admin).json()
-    assert any(x["id"] == t["id"] for x in pending)
+    assert any(x["id"] == t.id for x in pending)
 
 
-def test_approve_without_assignee_is_400(client, world):
-    member = auth_header(client, "member", "pw")
+def test_approve_without_assignee_is_400(client, db, world):
     admin = auth_header(client, "admin", "pw")
-    t = client.post(
-        "/api/tasks", headers=member, json={"title": "x", "board_id": world["board"].id}
-    ).json()
-    r = client.post(f"/api/tasks/{t['id']}/approve", headers=admin, json={"approve": True})
+    t = _pending_task(db, world, "x")
+    r = client.post(f"/api/tasks/{t.id}/approve", headers=admin, json={"approve": True})
     assert r.status_code == 400
 
 
