@@ -4,6 +4,7 @@ import { Empty, Segmented, Select, Spin, Table, Tag } from 'antd'
 import { getBoards, getColumns, getPool } from '../api/endpoints'
 import { CardDetailModal } from '../components/CardDetailModal'
 import { PoolBubbles } from '../components/PoolBubbles'
+import { fmtDateTime } from '../lib/tz'
 import type { Task } from '../api/types'
 
 type PoolView = 'list' | 'bubble'
@@ -65,7 +66,7 @@ export function PoolPage() {
       title: '截止',
       dataIndex: 'due_date',
       key: 'due_date',
-      render: (d: string | null) => (d ? new Date(d).toLocaleString('zh-CN') : '—'),
+      render: (d: string | null) => (d ? fmtDateTime(d) : '—'),
     },
   ]
 

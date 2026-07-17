@@ -28,15 +28,17 @@ function task(id: number, archived_at: string | null): Task {
 }
 
 describe('groupByWeek', () => {
-  // Reference "now" inside the week of Mon 2026-06-29 .. Sun 2026-07-05.
-  const now = new Date(2026, 6, 2) // 2026-07-02 (Thu)
+  // Weeks are China-calendar (Asia/Shanghai) regardless of the machine timezone,
+  // so inputs are absolute instants (…Z). "now" = 2026-07-02 12:00 China (Thu),
+  // in the week of Mon 2026-06-29 .. Sun 2026-07-05.
+  const now = new Date('2026-07-02T04:00:00Z')
 
-  it('buckets tasks into Monday-based weeks, newest first', () => {
+  it('buckets tasks into Monday-based China weeks, newest first', () => {
     const groups = groupByWeek(
       [
-        task(1, '2026-07-01T09:00:00'), // this week (Mon 06-29)
-        task(2, '2026-06-24T10:00:00'), // prev week (Mon 06-22)
-        task(3, '2026-06-23T10:00:00'), // same prev week
+        task(1, '2026-07-01T01:00:00Z'), // China 07-01 09:00 -> this week (Mon 06-29)
+        task(2, '2026-06-24T02:00:00Z'), // China 06-24 10:00 -> prev week (Mon 06-22)
+        task(3, '2026-06-23T02:00:00Z'), // China 06-23 10:00 -> same prev week
       ],
       now,
     )
@@ -48,15 +50,22 @@ describe('groupByWeek', () => {
 
   it('sorts cards within a week newest-archived first', () => {
     const groups = groupByWeek(
-      [task(1, '2026-06-23T08:00:00'), task(2, '2026-06-25T08:00:00')],
+      [task(1, '2026-06-23T00:00:00Z'), task(2, '2026-06-25T00:00:00Z')],
       now,
     )
     expect(groups[0].tasks.map((t) => t.id)).toEqual([2, 1])
   })
 
   it('collects undated cards into a trailing 更早 bucket', () => {
-    const groups = groupByWeek([task(1, '2026-07-01T09:00:00'), task(2, null)], now)
+    const groups = groupByWeek([task(1, '2026-07-01T01:00:00Z'), task(2, null)], now)
     expect(groups[groups.length - 1]).toMatchObject({ key: 'earlier', label: '更早' })
     expect(groups[groups.length - 1].tasks.map((t) => t.id)).toEqual([2])
+  })
+
+  it('groups by China calendar day even for a non-China viewer', () => {
+    // An instant at 2026-07-06 22:00 UTC is 2026-07-07 06:00 in China (next week's
+    // Mon 07-06 week), not 07-06. The grouping must follow China, not UTC/local.
+    const groups = groupByWeek([task(1, '2026-07-06T22:00:00Z')], now)
+    expect(groups[0].key).toBe('2026-07-06')
   })
 })

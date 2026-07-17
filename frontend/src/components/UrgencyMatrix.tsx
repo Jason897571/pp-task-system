@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import type { Task } from '../api/types'
 import { PRIORITY_LABEL } from '../lib/badges'
+import { dayDiffTZ } from '../lib/tz'
 import { UserAvatar } from './UserAvatar'
 
 // Urgency matrix: priority (rows) × time-to-DDL (columns). A task lands in one
@@ -17,17 +18,6 @@ const BUCKETS: { key: string; label: string; test: (n: number | null) => boolean
 ]
 const PRIS = ['high', 'normal', 'low'] as const
 
-// Whole days between today and the due date, in local time (so a card due
-// "tomorrow" reads as +1 regardless of the stored UTC hour).
-function dayDiff(iso: string | null): number | null {
-  if (!iso) return null
-  const d = new Date(iso)
-  const due = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  return Math.round((due - today) / 86_400_000)
-}
-
 export function UrgencyMatrix({
   tasks,
   onOpen,
@@ -35,7 +25,7 @@ export function UrgencyMatrix({
   tasks: Task[]
   onOpen: (id: number) => void
 }) {
-  const bucketOf = (t: Task) => BUCKETS.findIndex((b) => b.test(dayDiff(t.due_date)))
+  const bucketOf = (t: Task) => BUCKETS.findIndex((b) => b.test(dayDiffTZ(t.due_date)))
   const counts = BUCKETS.map((_, ci) => tasks.filter((t) => bucketOf(t) === ci).length)
 
   return (

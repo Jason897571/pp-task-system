@@ -1,6 +1,24 @@
 from datetime import datetime, timezone
+from typing import Annotated
+from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, PlainSerializer, field_serializer
+
+# created_at / updated_at are written by the DB clock (container TZ=Asia/Shanghai),
+# so they are Shanghai wall-clock. Tag them with +08:00 on the way out so clients
+# (whose browser may be in any timezone) read the correct instant.
+_SHANGHAI = ZoneInfo("Asia/Shanghai")
+
+
+def _shanghai_iso(v: datetime | None) -> str | None:
+    if v is None:
+        return None
+    if v.tzinfo is None:
+        v = v.replace(tzinfo=_SHANGHAI)
+    return v.isoformat()
+
+
+ShanghaiDT = Annotated[datetime, PlainSerializer(_shanghai_iso, return_type=str, when_used="json")]
 
 
 class UserOut(BaseModel):
@@ -88,16 +106,17 @@ class TaskOut(BaseModel):
     deleted_at: datetime | None = None
     archived_at: datetime | None = None
     completed_at: datetime | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: ShanghaiDT
+    updated_at: ShanghaiDT
     tags: list[TagOut] = []
     checklist_stats: ChecklistStats = ChecklistStats(done=0, total=0)
 
     @field_serializer("due_date", "deleted_at", "archived_at", "completed_at")
     def _serialize_utc(self, v: datetime | None) -> str | None:
-        # due_date / deleted_at are stored naive-UTC. Mark them UTC on the way out
-        # so the browser converts to local time instead of reading the bare string
-        # as local. (created_at/updated_at use DB-local func.now(); left untouched.)
+        # due_date / deleted_at / archived_at / completed_at are stored naive-UTC.
+        # Mark them UTC on the way out so the client reads the right instant.
+        # (created_at/updated_at come from the DB clock and are tagged +08:00 via
+        # the ShanghaiDT type instead.)
         if v is None:
             return None
         if v.tzinfo is None:
@@ -115,7 +134,7 @@ class AttachmentOut(BaseModel):
     filesize: int
     content_type: str | None
     uploader: UserOut
-    created_at: datetime
+    created_at: ShanghaiDT
 
 
 class DeliverableOut(BaseModel):
@@ -124,7 +143,7 @@ class DeliverableOut(BaseModel):
     id: int
     submitter: UserOut
     note: str | None
-    created_at: datetime
+    created_at: ShanghaiDT
     attachments: list[AttachmentOut] = []
 
 
@@ -133,14 +152,14 @@ class ApplicationOut(BaseModel):
 
     id: int
     applicant: UserOut
-    created_at: datetime
+    created_at: ShanghaiDT
 
 
 class CommentOut(BaseModel):
     id: int
     author: UserOut
     body: str
-    created_at: datetime
+    created_at: ShanghaiDT
     attachments: list[AttachmentOut] = []
 
 

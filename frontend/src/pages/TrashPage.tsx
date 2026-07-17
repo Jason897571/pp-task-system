@@ -3,6 +3,7 @@ import { Button, Empty, Popconfirm, Spin, Table, Tag, App as AntApp } from 'antd
 import dayjs from 'dayjs'
 import { getBoards, getTrash, purgeTask, restoreCard } from '../api/endpoints'
 import { errMessage } from '../api/client'
+import { fmtDateTime } from '../lib/tz'
 import type { Task } from '../api/types'
 
 const RETENTION_DAYS = 30
@@ -49,7 +50,7 @@ export function TrashPage() {
       title: '删除时间',
       dataIndex: 'deleted_at',
       key: 'deleted_at',
-      render: (d: string | null) => (d ? dayjs(d).format('YYYY-MM-DD HH:mm') : '—'),
+      render: (d: string | null) => (d ? fmtDateTime(d) : '—'),
     },
     {
       title: '剩余',

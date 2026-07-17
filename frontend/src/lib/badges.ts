@@ -1,4 +1,5 @@
 import type { ColumnKind, Tag, TagColor } from '../api/types'
+import { fmtMonthDayTime } from './tz'
 
 // Open a tag's link in a new tab, if it has one. Used on the board card face and
 // in the detail modal so clicking a linked tag jumps to its URL.
@@ -59,11 +60,6 @@ export function dueState(dueDate: string | null, columnKind: ColumnKind): DueSta
 }
 
 export function dueLabel(dueDate: string): string {
-  const d = new Date(dueDate)
-  return d.toLocaleString('zh-CN', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  // Always render in the team timezone, not the viewer's browser timezone.
+  return fmtMonthDayTime(dueDate)
 }

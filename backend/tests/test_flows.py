@@ -1313,6 +1313,27 @@ def test_push_feishu_works_without_assignee(client, world):
     assert r.status_code == 200 and r.json()["ok"] is True
 
 
+def test_timestamps_carry_timezone_offset(client, world):
+    # created_at/updated_at are DB (Shanghai) wall-clock -> tagged +08:00 so any
+    # browser reads the right instant; due_date stays UTC (+00:00).
+    admin = auth_header(client, "admin", "pw")
+    r = client.post(
+        "/api/tasks",
+        headers=admin,
+        json={
+            "title": "时区检查",
+            "board_id": world["board"].id,
+            "assignee_id": world["member"].id,
+            "due_date": "2026-07-20T07:00:00+00:00",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["created_at"].endswith("+08:00")
+    assert body["updated_at"].endswith("+08:00")
+    assert body["due_date"].endswith("+00:00")
+
+
 def test_update_task_title(client, world):
     admin = auth_header(client, "admin", "pw")
     t = _assigned_task(client, world)

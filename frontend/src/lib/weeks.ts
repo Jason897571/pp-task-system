@@ -1,4 +1,5 @@
 import type { Task } from '../api/types'
+import { toTZDate } from './tz'
 
 // One week's worth of archived cards, for the 归档看板「按周」view.
 export interface WeekGroup {
@@ -23,17 +24,18 @@ const md = (d: Date) => `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 // Group archived tasks into weeks by archived_at, newest week first. Cards with
 // no (or invalid) archived_at fall into a trailing '更早' bucket.
 export function groupByWeek(tasks: Task[], now: Date = new Date()): WeekGroup[] {
-  const currentKey = ymd(weekStart(now))
+  // Group by China's calendar week, independent of the viewer's browser timezone.
+  const currentKey = ymd(weekStart(toTZDate(now)))
   const buckets = new Map<string, Task[]>()
   const earlier: Task[] = []
 
   for (const t of tasks) {
-    const d = t.archived_at ? new Date(t.archived_at) : null
-    if (!d || isNaN(d.getTime())) {
+    const raw = t.archived_at ? new Date(t.archived_at) : null
+    if (!raw || isNaN(raw.getTime())) {
       earlier.push(t)
       continue
     }
-    const key = ymd(weekStart(d))
+    const key = ymd(weekStart(toTZDate(t.archived_at!)))
     const bucket = buckets.get(key)
     if (bucket) bucket.push(t)
     else buckets.set(key, [t])

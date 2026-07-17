@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { getTasks, linkTask, unlinkTask } from '../api/endpoints'
 import { errMessage } from '../api/client'
 import { PRIORITY_LABEL } from '../lib/badges'
+import { fmtDateTime } from '../lib/tz'
 import type { LinkedTask } from '../api/types'
 
 function PreviewRow({ label, value }: { label: string; value: string | null | undefined }) {
@@ -141,7 +142,7 @@ export function LinkedTasksSection({
             <PreviewRow label="优先级" value={PRIORITY_LABEL[preview.priority] ?? preview.priority} />
             <PreviewRow
               label="截止"
-              value={preview.due_date ? new Date(preview.due_date).toLocaleString('zh-CN') : '无'}
+              value={preview.due_date ? fmtDateTime(preview.due_date) : '无'}
             />
           </div>
         )}

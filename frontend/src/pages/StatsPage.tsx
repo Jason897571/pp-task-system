@@ -10,6 +10,7 @@ import {
   syncFeishu,
 } from '../api/endpoints'
 import { errMessage } from '../api/client'
+import { fmtDateTime } from '../lib/tz'
 import { useAuth } from '../auth/AuthContext'
 import type { MemberStats, Task } from '../api/types'
 
@@ -211,7 +212,7 @@ export function StatsPage() {
               {
                 title: '截止',
                 dataIndex: 'due_date',
-                render: (d: string | null) => (d ? new Date(d).toLocaleString('zh-CN') : '—'),
+                render: (d: string | null) => (d ? fmtDateTime(d) : '—'),
               },
             ]}
           />
