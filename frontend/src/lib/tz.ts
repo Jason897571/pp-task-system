@@ -13,6 +13,7 @@ export const APP_TZ = 'Asia/Shanghai'
 // --- display (an ISO instant -> a string in APP_TZ) ---
 export const fmtDateTime = (iso: string): string => dayjs(iso).tz(APP_TZ).format('YYYY-MM-DD HH:mm')
 export const fmtMonthDayTime = (iso: string): string => dayjs(iso).tz(APP_TZ).format('M/D HH:mm')
+export const fmtMD = (iso: string): string => dayjs(iso).tz(APP_TZ).format('M/D')
 
 // --- DatePicker <-> stored value ---
 // Show a stored UTC instant as its APP_TZ wall-clock in the picker.
