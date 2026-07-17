@@ -1,7 +1,7 @@
 import { useState, type ClipboardEvent } from 'react'
 import { Button, DatePicker, Input, Modal, Select, Spin, Upload, App as AntApp } from 'antd'
 import type { UploadFile } from 'antd'
-import { toPickerValue, fromPickerValue } from '../lib/tz'
+import { toPickerValue, fromPickerValue, defaultDueTime } from '../lib/tz'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   applyTask,
@@ -433,9 +433,9 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                         <span className="ic">📅</span>截止时间
                       </div>
                       <DatePicker
-                        showTime={{ format: 'HH:mm' }}
+                        showTime={{ format: 'HH:mm', defaultValue: defaultDueTime() }}
                         format="YYYY-MM-DD HH:mm"
-                        placeholder="设置截止时间（中国时间）"
+                        placeholder="设置截止时间（默认 18:00）"
                         style={{ width: 240 }}
                         value={toPickerValue(task.due_date)}
                         onChange={(d) => saveDue(fromPickerValue(d))}

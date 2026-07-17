@@ -23,6 +23,10 @@ export const toPickerValue = (iso: string | null | undefined): dayjs.Dayjs | nul
 export const fromPickerValue = (d: dayjs.Dayjs | null): string | null =>
   d ? dayjs.tz(d.format('YYYY-MM-DD HH:mm'), APP_TZ).toISOString() : null
 
+// Default time-of-day for a new DDL — 18:00, so picking a date and confirming is enough.
+export const defaultDueTime = (): dayjs.Dayjs =>
+  dayjs().tz(APP_TZ).hour(18).minute(0).second(0).millisecond(0)
+
 // --- calendar-day diff in APP_TZ (matrix "today / this week" bucketing) ---
 export const dayDiffTZ = (iso: string | null): number | null => {
   if (!iso) return null
