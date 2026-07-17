@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Button, Empty, Modal, Select, Spin, Table, App as AntApp } from 'antd'
+import { Button, Empty, Modal, Segmented, Select, Spin, Table, App as AntApp } from 'antd'
 import {
   exportWeekly,
   getBoards,
   getMemberStats,
   getStatsOverview,
+  getTags,
   getTasks,
   syncFeishu,
 } from '../api/endpoints'
 import { errMessage } from '../api/client'
 import { fmtDateTime } from '../lib/tz'
+import { TAG_COLORS } from '../lib/badges'
+import { WeeklyTagReport } from '../components/WeeklyTagReport'
 import { useAuth } from '../auth/AuthContext'
 import type { MemberStats, Task } from '../api/types'
 
@@ -82,6 +85,59 @@ function OverviewSection({ boardId }: { boardId: number }) {
         ))}
       </div>
     </>
+  )
+}
+
+// Weekly report grouped by tag (super_admin — reuses the /export/weekly data).
+function WeeklyReportSection() {
+  const [week, setWeek] = useState<'this' | 'last'>('this')
+  const { data: report, isLoading } = useQuery({
+    queryKey: ['weekly-report'],
+    queryFn: exportWeekly,
+  })
+  const { data: tags = [] } = useQuery({ queryKey: ['tags'], queryFn: getTags })
+  const colorOf = (name: string) => {
+    const t = tags.find((x) => x.name === name)
+    return t ? TAG_COLORS[t.color] : '#8c9bab'
+  }
+
+  const range = report ? (week === 'this' ? report.week.this_week : report.week.last_week) : null
+  const tasks = report
+    ? week === 'this'
+      ? report.this_week_completed
+      : report.last_week_completed
+    : []
+
+  return (
+    <div style={{ marginTop: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <h3 style={{ color: '#fff', margin: 0 }}>🏷 完成汇报 · 按标签</h3>
+        <Segmented
+          size="small"
+          value={week}
+          onChange={(v) => setWeek(v as 'this' | 'last')}
+          options={[
+            { label: '本周', value: 'this' },
+            { label: '上周', value: 'last' },
+          ]}
+        />
+        {range && (
+          <span style={{ color: 'var(--subtle)', fontSize: 13 }}>
+            {range.start} ~ {range.end} · 共 {tasks.length} 项完成
+          </span>
+        )}
+      </div>
+      <div
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid var(--line)',
+          borderRadius: 10,
+          padding: '10px 14px',
+        }}
+      >
+        {isLoading || !report ? <Spin /> : <WeeklyTagReport tasks={tasks} tagColor={colorOf} />}
+      </div>
+    </div>
   )
 }
 
@@ -165,6 +221,8 @@ export function StatsPage() {
       </div>
 
       {effectiveBoardId ? <OverviewSection boardId={effectiveBoardId} /> : <Empty description="暂无看板" />}
+
+      {user?.role === 'super_admin' && <WeeklyReportSection />}
 
       <h3 style={{ color: '#fff', marginTop: 28 }}>人员统计</h3>
       <Table
