@@ -16,7 +16,7 @@ from sqlalchemy import false, or_, select, true
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import require_super_admin
+from app.deps import require_admin
 from app.models import Board, BoardColumn, Task, User
 
 router = APIRouter(prefix="/api", tags=["export"])
@@ -41,9 +41,15 @@ def _iso_utc(dt: datetime | None) -> str | None:
 
 @router.get("/export/weekly")
 def export_weekly(
-    user: User = Depends(require_super_admin),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    # Admins see only their own department; super_admin sees everything.
+    def scope(stmt):
+        if user.role != "super_admin":
+            stmt = stmt.where(Task.department_id == user.department_id)
+        return stmt
+
     now_local = datetime.now(SH).replace(tzinfo=None)
     last_monday, this_monday, next_monday = _week_bounds(now_local)
 
@@ -105,7 +111,7 @@ def export_weekly(
         Task.column_id.in_(done_or_final_ids) if done_or_final_ids else false(),
         Task.board_id.in_(archive_board_ids) if archive_board_ids else false(),
     )
-    base_completed = (
+    base_completed = scope(
         select(Task)
         .where(Task.deleted_at.is_(None), Task.lifecycle == "on_board", completed_cond)
         .order_by(Task.updated_at.desc())
@@ -126,16 +132,18 @@ def export_weekly(
         Task.column_id.not_in(done_or_final_ids) if done_or_final_ids else true()
     )
     snapshot = db.scalars(
-        select(Task)
-        .where(
-            Task.deleted_at.is_(None),
-            Task.board_id.not_in(archive_board_ids) if archive_board_ids else true(),
-            or_(
-                Task.lifecycle.in_(("open", "pending_approval")),
-                (Task.lifecycle == "on_board") & not_done_cond,
-            ),
+        scope(
+            select(Task)
+            .where(
+                Task.deleted_at.is_(None),
+                Task.board_id.not_in(archive_board_ids) if archive_board_ids else true(),
+                or_(
+                    Task.lifecycle.in_(("open", "pending_approval")),
+                    (Task.lifecycle == "on_board") & not_done_cond,
+                ),
+            )
+            .order_by(Task.priority, Task.created_at.desc())
         )
-        .order_by(Task.priority, Task.created_at.desc())
     ).all()
 
     return {

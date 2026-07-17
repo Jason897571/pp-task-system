@@ -150,6 +150,7 @@ export function StatsPage() {
   const [memberTask, setMemberTask] = useState<MemberStats | null>(null)
   const [exporting, setExporting] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const isManager = user?.role === 'admin' || user?.role === 'super_admin'
   const effectiveBoardId = boardId ?? boards[0]?.id
 
   const onSyncFeishu = async () => {
@@ -209,20 +210,20 @@ export function StatsPage() {
         />
         <span style={{ flex: 1 }} />
         {user?.role === 'super_admin' && (
-          <>
-            <Button loading={syncing} onClick={onSyncFeishu}>
-              🔄 同步到飞书多维表格
-            </Button>
-            <Button loading={exporting} onClick={onExport}>
-              ⬇ 导出本周报表（JSON）
-            </Button>
-          </>
+          <Button loading={syncing} onClick={onSyncFeishu}>
+            🔄 同步到飞书多维表格
+          </Button>
+        )}
+        {isManager && (
+          <Button loading={exporting} onClick={onExport}>
+            ⬇ 导出本周报表（JSON）
+          </Button>
         )}
       </div>
 
       {effectiveBoardId ? <OverviewSection boardId={effectiveBoardId} /> : <Empty description="暂无看板" />}
 
-      {user?.role === 'super_admin' && <WeeklyReportSection />}
+      {isManager && <WeeklyReportSection />}
 
       <h3 style={{ color: '#fff', marginTop: 28 }}>人员统计</h3>
       <Table

@@ -1035,8 +1035,15 @@ def test_export_weekly_buckets(client, db, world):
     assert all("completed_at" in t for t in data["this_week_completed"])
     assert data["counts"]["this_week_completed"] == 1
 
-    # super-only
-    assert client.get("/api/export/weekly", headers=auth_header(client, "admin", "pw")).status_code == 403
+    # 研发 admin now has access too, scoped to their department (fixtures are all 研发).
+    admin_r = client.get("/api/export/weekly", headers=auth_header(client, "admin", "pw"))
+    assert admin_r.status_code == 200
+    assert {t["title"] for t in admin_r.json()["this_week_completed"]} == {"本周完成"}
+    # a different department's admin sees none of the 研发 tasks.
+    mkt_r = client.get("/api/export/weekly", headers=auth_header(client, "mkt_admin", "pw"))
+    assert mkt_r.status_code == 200 and mkt_r.json()["this_week_completed"] == []
+    # members still cannot access the report.
+    assert client.get("/api/export/weekly", headers=auth_header(client, "member", "pw")).status_code == 403
 
 
 def test_task_links_symmetric(client, db, world):
