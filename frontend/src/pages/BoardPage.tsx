@@ -30,6 +30,7 @@ import { DuplicateModal } from '../components/DuplicateModal'
 import { PRIORITY_RANK, TAG_COLORS } from '../lib/badges'
 import { CardDetailModal } from '../components/CardDetailModal'
 import { CardFront } from '../components/TaskCard'
+import { UrgencyMatrix } from '../components/UrgencyMatrix'
 import { groupByWeek } from '../lib/weeks'
 import { canDropInto } from '../lib/actions'
 import type { BoardColumn, CreateTaskBody, Task } from '../api/types'
@@ -72,6 +73,10 @@ export function BoardPage() {
   // archive board only: group cards by source board (default) or by archive week.
   const [archiveView, setArchiveView] = useState<'source' | 'week'>(() =>
     localStorage.getItem('archiveView') === 'week' ? 'week' : 'source',
+  )
+  // normal board: kanban columns (default) or the urgency matrix (priority × DDL).
+  const [boardView, setBoardView] = useState<'columns' | 'matrix'>(() =>
+    localStorage.getItem('boardView') === 'matrix' ? 'matrix' : 'columns',
   )
 
   const { data: columns = [], isLoading: colsLoading } = useQuery({
@@ -268,6 +273,16 @@ export function BoardPage() {
   const weekView = isArchive && archiveView === 'week'
   const weekGroups = weekView ? groupByWeek(visibleTasks) : []
 
+  // Urgency matrix (normal boards only). Completed cards (done / final column)
+  // are triage noise, so the matrix shows outstanding work only.
+  const matrixView = !isArchive && boardView === 'matrix'
+  const doneColIds = new Set(
+    columns.filter((c) => c.kind === 'done' || c.is_final).map((c) => c.id),
+  )
+  const matrixTasks = visibleTasks.filter(
+    (t) => t.column_id == null || !doneColIds.has(t.column_id),
+  )
+
   return (
     <>
       <div className="board-header">
@@ -297,6 +312,21 @@ export function BoardPage() {
             options={[
               { label: '按来源看板', value: 'source' },
               { label: '按周', value: 'week' },
+            ]}
+          />
+        )}
+        {!isArchive && (
+          <Segmented
+            size="small"
+            value={boardView}
+            onChange={(v) => {
+              const val = v as 'columns' | 'matrix'
+              setBoardView(val)
+              localStorage.setItem('boardView', val)
+            }}
+            options={[
+              { label: '看板', value: 'columns' },
+              { label: '矩阵', value: 'matrix' },
             ]}
           />
         )}
@@ -389,6 +419,14 @@ export function BoardPage() {
               </div>
             ))}
           </div>
+        )
+      ) : matrixView ? (
+        matrixTasks.length === 0 ? (
+          <div style={{ display: 'grid', placeItems: 'center', flex: 1 }}>
+            <Empty description="暂无进行中的任务" />
+          </div>
+        ) : (
+          <UrgencyMatrix tasks={matrixTasks} onOpen={openCard} />
         )
       ) : (
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
