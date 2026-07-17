@@ -1,5 +1,9 @@
 import type { WeeklyExportTask } from '../api/types'
-import { PRIORITY_LABEL } from '../lib/badges'
+import { PRIORITY_LABEL, PRIORITY_RANK } from '../lib/badges'
+
+// Within a group, P0 first, then P1, then P2 (stable for equal priority).
+const byPriority = (a: WeeklyExportTask, b: WeeklyExportTask) =>
+  (PRIORITY_RANK[a.priority] ?? 1) - (PRIORITY_RANK[b.priority] ?? 1)
 
 // The weekly report grouped by tag: one section per tag (colored pill + count +
 // share bar), listing that tag's completed tasks. A task with several tags shows
@@ -56,7 +60,7 @@ export function WeeklyTagReport({
               </span>
               <span className="wr-pct">{pct}%</span>
             </div>
-            {items.map((t) => (
+            {[...items].sort(byPriority).map((t) => (
               <Row key={t.id} t={t} curTag={name} />
             ))}
           </div>
@@ -68,7 +72,7 @@ export function WeeklyTagReport({
             <span className="wr-pill wr-none">未分类</span>
             <span className="wr-cnt">{untagged.length} 项</span>
           </div>
-          {untagged.map((t) => (
+          {[...untagged].sort(byPriority).map((t) => (
             <Row key={t.id} t={t} />
           ))}
         </div>
