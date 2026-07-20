@@ -625,14 +625,19 @@ def comment_task(
     # Notify the people involved (assignee + creator), minus the commenter.
     for uid in {task.assignee_id, task.creator_id} - {None, user.id}:
         notify(db, uid, "comment", f"任务「{task.title}」收到评论：{text}", task.id)
-    assignee = task.assignee  # the person doing the task — @-ed on Feishu
     db.commit()
     db.refresh(act)
-    if assignee is not None and assignee.id != user.id:
-        snippet = text if len(text) <= 100 else text[:100] + "…"
-        _feishu_task_card(
-            task, assignee, "💬 新评论", f"评论人：{_name(user)}", extra=f"**💬 评论**　{snippet}"
-        )
+    # Always push the comment to the group bot so it's visible to everyone;
+    # @-mention the counterpart — if the commenter is the assignee, mention the
+    # creator (admin), otherwise mention the assignee. No counterpart → post
+    # the card without an @-mention.
+    recipient = task.creator if user.id == task.assignee_id else task.assignee
+    if recipient is not None and recipient.id == user.id:
+        recipient = None
+    snippet = text if len(text) <= 100 else text[:100] + "…"
+    _feishu_task_card(
+        task, recipient, "💬 新评论", f"评论人：{_name(user)}", extra=f"**💬 评论**　{snippet}"
+    )
     return CommentOut(
         id=act.id,
         author=UserOut.model_validate(user),
