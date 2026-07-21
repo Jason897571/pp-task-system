@@ -231,12 +231,12 @@ def update_task(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Edit task details (title / description / priority / due date). admin/super
-    (admin scoped to own department)."""
+    """Edit task details (title / description / priority / due date). Editable by
+    a scoped admin/super or the task's assignee."""
     task = db.get(Task, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="任务不存在")
-    if not admin_can_touch_task(user, task):
+    if not can_edit_task(user, task):
         raise HTTPException(status_code=403, detail="无权编辑该任务")
     data = body.model_dump(exclude_unset=True)
     if "title" in data and data["title"] is not None:
@@ -589,15 +589,16 @@ def review_task(
 @router.post("/tasks/{task_id}/push-feishu")
 def push_task_to_feishu(
     task_id: int,
-    user: User = Depends(require_admin),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Manually push the task as a card to the Feishu group (managers only).
-    Best-effort: the card is fired in the background, so this always returns ok."""
+    """Manually push the task as a card to the Feishu group. Pushable by a scoped
+    admin/super or the task's assignee. Best-effort: the card is fired in the
+    background, so this always returns ok."""
     task = db.get(Task, task_id)
     if task is None or task.deleted_at is not None:
         raise HTTPException(status_code=404, detail="任务不存在")
-    if not admin_can_touch_task(user, task):
+    if not can_edit_task(user, task):
         raise HTTPException(status_code=403, detail="无权推送该任务")
     _feishu_task_card(task, task.assignee, "📌 任务推送", f"推送人：{_name(user)}")
     return {"ok": True}

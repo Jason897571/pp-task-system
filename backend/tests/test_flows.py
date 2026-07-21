@@ -1293,20 +1293,46 @@ def test_completed_at_persists_on_leave_and_refreshes_on_reenter(client, db, wor
 # --------------------------------------------------------------------------
 
 
-def test_push_feishu_manager_only(client, world):
+def test_push_feishu_assignee_or_manager(client, world):
     admin = auth_header(client, "admin", "pw")
-    member = auth_header(client, "member", "pw")
+    member = auth_header(client, "member", "pw")  # the assignee
+    member2 = auth_header(client, "member2", "pw")  # not involved
     t = _assigned_task(client, world)
 
     # manager can push (webhook is disabled in tests -> just returns ok)
     r = client.post(f"/api/tasks/{t['id']}/push-feishu", headers=admin)
     assert r.status_code == 200 and r.json()["ok"] is True
 
-    # a member cannot push
-    assert client.post(f"/api/tasks/{t['id']}/push-feishu", headers=member).status_code == 403
+    # the assignee can push their own card
+    assert client.post(f"/api/tasks/{t['id']}/push-feishu", headers=member).status_code == 200
+
+    # an uninvolved member cannot push
+    assert client.post(f"/api/tasks/{t['id']}/push-feishu", headers=member2).status_code == 403
 
     # missing task 404s
     assert client.post("/api/tasks/999999/push-feishu", headers=admin).status_code == 404
+
+
+def test_update_task_assignee_can_edit(client, world):
+    admin = auth_header(client, "admin", "pw")
+    member = auth_header(client, "member", "pw")  # the assignee
+    member2 = auth_header(client, "member2", "pw")  # not involved
+    t = _assigned_task(client, world)
+
+    # the assignee can edit title / description / priority / due date
+    r = client.put(
+        f"/api/tasks/{t['id']}",
+        headers=member,
+        json={"title": "改过的标题", "description": "执行人补充的说明", "priority": "high"},
+    )
+    assert r.status_code == 200
+    assert r.json()["title"] == "改过的标题"
+
+    # admin can still edit
+    assert client.put(f"/api/tasks/{t['id']}", headers=admin, json={"title": "管理员改"}).status_code == 200
+
+    # an uninvolved member cannot edit
+    assert client.put(f"/api/tasks/{t['id']}", headers=member2, json={"title": "x"}).status_code == 403
 
 
 def test_push_feishu_works_without_assignee(client, world):

@@ -314,7 +314,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
             <div className="cm-zonetag">需求 · REQUIREMENT</div>
             <div className="cm-titlerow">
               <span className="cm-no" title="任务编号">#{task.id}</span>
-              {editingTitle && isManager ? (
+              {editingTitle && canEdit ? (
                 <Input.TextArea
                   className="cm-title-input"
                   autoFocus
@@ -329,10 +329,10 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                 />
               ) : (
                 <h2
-                  className={`cm-title ${isManager ? 'editable' : ''}`}
-                  title={isManager ? '点击编辑标题' : undefined}
+                  className={`cm-title ${canEdit ? 'editable' : ''}`}
+                  title={canEdit ? '点击编辑标题' : undefined}
                   onClick={
-                    isManager
+                    canEdit
                       ? () => {
                           setTitleDraft(task.title)
                           setEditingTitle(true)
@@ -368,7 +368,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
             <section className="cd-sec">
               <div className="cd-sec-h">
                 <span className="ic">📝</span>需求描述
-                {isManager && !editingDesc && (
+                {canEdit && !editingDesc && (
                   <button
                     type="button"
                     className="cm-edit"
@@ -406,9 +406,9 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                 </div>
               ) : (
                 <div
-                  className={`cm-desc ${task.description ? '' : 'empty'} ${isManager ? 'editable' : ''}`}
+                  className={`cm-desc ${task.description ? '' : 'empty'} ${canEdit ? 'editable' : ''}`}
                   onClick={
-                    isManager
+                    canEdit
                       ? () => {
                           setDescDraft(task.description || '')
                           setEditingDesc(true)
@@ -416,7 +416,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                       : undefined
                   }
                 >
-                  {task.description || (isManager ? '点击添加描述…' : '暂无描述')}
+                  {task.description || (canEdit ? '点击添加描述…' : '暂无描述')}
                 </div>
               )}
             </section>
@@ -424,9 +424,9 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
             {/* 截止时间 / 优先级 are admin-only here — members already see them in
                the top chips. 需求附件 shows for managers (with upload) or whenever
                files exist (read-only for members). */}
-            {(isManager || task.attachments.length > 0) && (
+            {(canEdit || task.attachments.length > 0) && (
               <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                {isManager && (
+                {canEdit && (
                   <>
                     <section className="cd-sec" style={{ flex: '0 0 auto' }}>
                       <div className="cd-sec-h">
@@ -460,7 +460,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                   <AttachmentsSection
                     taskId={task.id}
                     attachments={task.attachments}
-                    canEdit={isManager}
+                    canEdit={canEdit}
                     onChanged={invalidate}
                   />
                 </div>
@@ -469,11 +469,11 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
 
             {/* Checklist is part of the requirement definition — managers only. For
                members it shows read-only when items exist, and is hidden otherwise. */}
-            {(isManager || task.checklists.length > 0) && (
+            {(canEdit || task.checklists.length > 0) && (
               <ChecklistsSection
                 taskId={task.id}
                 checklists={task.checklists}
-                canEdit={isManager}
+                canEdit={canEdit}
                 onChanged={invalidate}
               />
             )}
@@ -496,7 +496,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
               />
             )}
 
-            {isManager && (
+            {canEdit && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
                 <Button
                   loading={pushM.isPending}
