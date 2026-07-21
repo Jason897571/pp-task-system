@@ -6,6 +6,7 @@ used (no extra deps); the app must be a collaborator on the target wiki doc with
 bitable + wiki permissions.
 """
 import json
+import re
 import threading
 import urllib.error
 import urllib.request
@@ -56,7 +57,7 @@ _PRIORITY_CARD = {
     "normal": ("🟡 P1", "blue"),
     "low": ("⚪ P2", "grey"),
 }
-_DETAIL_MAX = 120
+_DETAIL_MAX = 1000
 
 
 def build_task_card(
@@ -91,10 +92,14 @@ def build_task_card(
     if due_date:
         lines.append(f"**📅 DDL**　{due_date}")
     if description:
-        detail = " ".join(description.split())
+        # Keep the author's line breaks (and numbered lists) intact; only trim
+        # trailing whitespace per line and collapse 3+ blank lines to one gap.
+        detail = re.sub(r"\n{3,}", "\n\n", description.strip())
+        detail = "\n".join(ln.rstrip() for ln in detail.split("\n"))
         if len(detail) > _DETAIL_MAX:
             detail = detail[:_DETAIL_MAX] + "…"
-        lines.append(f"**📄 详情**　{detail}")
+        # Label on its own line so the multi-line body reads cleanly below it.
+        lines.append(f"**📄 详情**\n{detail}")
     if extra:
         lines.append(extra)
 

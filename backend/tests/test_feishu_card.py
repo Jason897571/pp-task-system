@@ -74,9 +74,21 @@ def test_card_omits_missing_due_and_detail_rows():
 
 
 def test_card_truncates_long_detail():
-    body = _body(_card(description="x" * 300))
+    body = _body(_card(description="x" * 1200))
     assert "…" in body
-    assert "x" * 300 not in body
+    assert "x" * 1200 not in body
+
+
+def test_card_keeps_full_detail_under_cap():
+    # descriptions up to the cap are shown in full, not truncated
+    body = _body(_card(description="y" * 300))
+    assert "y" * 300 in body
+    assert "…" not in body
+
+
+def test_card_preserves_description_line_breaks():
+    body = _body(_card(description="第一行\n需求：\n1. a\n2. b"))
+    assert "第一行\n需求：\n1. a\n2. b" in body
 
 
 def test_card_extra_line_is_appended_to_body():
