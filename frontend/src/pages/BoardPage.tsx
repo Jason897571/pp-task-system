@@ -273,14 +273,19 @@ export function BoardPage() {
   const weekView = isArchive && archiveView === 'week'
   const weekGroups = weekView ? groupByWeek(visibleTasks) : []
 
-  // Urgency matrix (normal boards only). Completed cards (done / final column)
-  // are triage noise, so the matrix shows outstanding work only.
+  // Urgency matrix (normal boards only). Completed cards are triage noise, so the
+  // matrix shows outstanding work only. A card counts as done if it was accepted
+  // (completed_at set — persists even after it's moved to a post-completion column)
+  // or it currently sits in a done / final column (covers boards whose done column
+  // never stamps completed_at).
   const matrixView = !isArchive && boardView === 'matrix'
   const doneColIds = new Set(
     columns.filter((c) => c.kind === 'done' || c.is_final).map((c) => c.id),
   )
   const matrixTasks = visibleTasks.filter(
-    (t) => t.column_id == null || !doneColIds.has(t.column_id),
+    (t) =>
+      t.completed_at == null &&
+      (t.column_id == null || !doneColIds.has(t.column_id)),
   )
 
   return (
