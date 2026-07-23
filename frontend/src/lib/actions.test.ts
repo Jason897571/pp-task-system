@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { canDrag, canDropInto, visibleActions } from './actions'
+import { adjacentColumns, canDrag, canDropInto, visibleActions } from './actions'
 import type { ActionContext } from './actions'
+import type { BoardColumn, Task } from '../api/types'
 
 const member = { id: 1, role: 'member' as const }
 const otherMember = { id: 2, role: 'member' as const }
@@ -105,5 +106,34 @@ describe('drag rules', () => {
     expect(canDropInto(doing, { role: 'member', boardHasReview: true }).ok).toBe(true)
     // admin moves anywhere
     expect(canDropInto(done, { role: 'admin', boardHasReview: true }).ok).toBe(true)
+  })
+})
+
+describe('adjacentColumns — card ‹ / › arrows', () => {
+  const col = (id: number, position: number, kind: BoardColumn['kind'], requires_review = false) =>
+    ({ id, board_id: 1, name: `c${id}`, kind, position, is_final: false, requires_review }) as BoardColumn
+  // start(1) → review(2, gate) → done(3). Out of order to prove sorting by position.
+  const cols = [col(3, 3, 'done'), col(1, 1, 'start'), col(2, 2, 'review', true)]
+  const task = (columnId: number | null, assigneeId: number | null): Pick<Task, 'assignee' | 'column_id'> => ({
+    column_id: columnId,
+    assignee: assigneeId ? onBoard(assigneeId).assignee : null,
+  })
+
+  it('gives both neighbours in the middle column (admin bypasses the review gate)', () => {
+    const { prev, next } = adjacentColumns(cols, task(2, 1), admin)
+    expect(prev?.id).toBe(1)
+    expect(next?.id).toBe(3)
+  })
+  it('hides the back arrow on the first column', () => {
+    expect(adjacentColumns(cols, task(1, 1), member).prev).toBeNull()
+    expect(adjacentColumns(cols, task(1, 1), member).next?.id).toBe(2)
+  })
+  it('member cannot step forward into done through the review gate', () => {
+    const { prev, next } = adjacentColumns(cols, task(2, 1), member)
+    expect(prev?.id).toBe(1)
+    expect(next).toBeNull()
+  })
+  it('gives nothing for a card the member does not own', () => {
+    expect(adjacentColumns(cols, task(2, 2), member)).toEqual({ prev: null, next: null })
   })
 })

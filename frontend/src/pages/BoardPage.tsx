@@ -440,12 +440,14 @@ export function BoardPage() {
               <BoardColumnView
                 key={col.id}
                 col={col}
+                columns={sorted}
                 tasks={colTasks(col.id)}
                 me={{ id: user!.id, role: user!.role }}
                 isSuperAdmin={isSuperAdmin}
                 assignees={assignees}
                 departments={departments}
                 onOpenCard={openCard}
+                onMove={(id, columnId) => moveM.mutate({ id, columnId })}
                 onAddCard={(_colId, title, assigneeId, departmentId) =>
                   addCardM.mutate({ title, assigneeId, departmentId })
                 }

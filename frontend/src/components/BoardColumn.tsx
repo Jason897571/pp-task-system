@@ -3,7 +3,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { Button, Dropdown, Input, Modal, Select } from 'antd'
 import type { BoardColumn as Col, Department, Task, User } from '../api/types'
 import { CardFront } from './TaskCard'
-import { canDrag } from '../lib/actions'
+import { adjacentColumns, canDrag } from '../lib/actions'
 
 // Sentinel for the "加入需求池" choice in the create-card picker (no real user
 // has id 0, so it can never collide with an assignee).
@@ -108,15 +108,19 @@ function AddCardModal({
 function DraggableCard({
   task,
   col,
+  columns,
   me,
   onOpen,
+  onMove,
   onRestore,
   onCopy,
 }: {
   task: Task
   col: Col
+  columns: Col[]
   me: Pick<User, 'id' | 'role'>
   onOpen: (id: number) => void
+  onMove: (taskId: number, columnId: number) => void
   onRestore?: (task: Task) => void
   onCopy?: (task: Task) => void
 }) {
@@ -126,6 +130,8 @@ function DraggableCard({
     data: { task },
     disabled: !draggable,
   })
+  // ‹ / › move the card to the previous / next column (same rules as drag).
+  const { prev, next } = adjacentColumns(columns, task, me)
 
   // Assignee's personal card colour (set in 个人设置) tints their cards for everyone.
   const cardColor = task.assignee?.card_color || undefined
@@ -153,6 +159,34 @@ function DraggableCard({
           ⧉
         </button>
       )}
+      {prev && (
+        <button
+          type="button"
+          className="card-move card-move-l"
+          title={`移到「${prev.name}」`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            onMove(task.id, prev.id)
+          }}
+        >
+          ‹
+        </button>
+      )}
+      {next && (
+        <button
+          type="button"
+          className="card-move card-move-r"
+          title={`移到「${next.name}」`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            onMove(task.id, next.id)
+          }}
+        >
+          ›
+        </button>
+      )}
       <CardFront task={task} columnKind={col.kind} isFinal={col.is_final} />
       {onRestore && (
         <button
@@ -172,12 +206,14 @@ function DraggableCard({
 
 interface Props {
   col: Col
+  columns: Col[]
   tasks: Task[]
   me: Pick<User, 'id' | 'role'>
   isSuperAdmin: boolean
   assignees: User[]
   departments: Department[]
   onOpenCard: (id: number) => void
+  onMove: (taskId: number, columnId: number) => void
   onAddCard: (
     colId: number,
     title: string,
@@ -194,12 +230,14 @@ interface Props {
 
 export function BoardColumnView({
   col,
+  columns,
   tasks,
   me,
   isSuperAdmin,
   assignees,
   departments,
   onOpenCard,
+  onMove,
   onAddCard,
   onRenameColumn,
   onDeleteColumn,
@@ -305,8 +343,10 @@ export function BoardColumnView({
             key={t.id}
             task={t}
             col={col}
+            columns={columns}
             me={me}
             onOpen={onOpenCard}
+            onMove={onMove}
             onRestore={onRestore}
             onCopy={onCopy}
           />

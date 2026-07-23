@@ -75,3 +75,22 @@ export function canDropInto(
   }
   return { ok: true }
 }
+
+// Adjacent columns a card may be moved into by the ‹ / › card arrows — the same
+// rules as drag: only movable cards (member: own only), and drop must be allowed
+// (member can't step into a done column when the board has a review gate). A null
+// side means "no button" (edge of board or not permitted).
+export function adjacentColumns(
+  columns: BoardColumn[],
+  task: Pick<Task, 'assignee' | 'column_id'>,
+  me: Pick<User, 'id' | 'role'>,
+): { prev: BoardColumn | null; next: BoardColumn | null } {
+  if (!canDrag(task, me) || task.column_id == null) return { prev: null, next: null }
+  const sorted = [...columns].sort((a, b) => a.position - b.position)
+  const idx = sorted.findIndex((c) => c.id === task.column_id)
+  if (idx < 0) return { prev: null, next: null }
+  const boardHasReview = sorted.some((c) => c.requires_review)
+  const ok = (c: BoardColumn | undefined) =>
+    c && canDropInto(c, { role: me.role, boardHasReview }).ok ? c : null
+  return { prev: ok(sorted[idx - 1]), next: ok(sorted[idx + 1]) }
+}

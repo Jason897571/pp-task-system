@@ -11,6 +11,7 @@ import {
   deleteTask,
   getAssignableUsers,
   getTask,
+  moveTask,
   pushTaskToFeishu,
   reviewTask,
   startTask,
@@ -29,6 +30,7 @@ import { LinkedTasksSection } from './LinkedTasksSection'
 import { TagsSection } from './TagsSection'
 import { UserAvatar } from './UserAvatar'
 import { dueLabel, dueState, PRIORITY_LABEL, PRIORITY_OPTIONS } from '../lib/badges'
+import { adjacentColumns } from '../lib/actions'
 import { imagesFromClipboard } from '../lib/clipboard'
 
 interface Props {
@@ -97,6 +99,16 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
   const assignM = useMutation({ mutationFn: (id: number) => assignTask(taskId, id) })
   const toPoolM = useMutation({ mutationFn: () => toPoolTask(taskId) })
   const pushM = useMutation({ mutationFn: () => pushTaskToFeishu(taskId) })
+  // ‹ 后退 / 前进 › — move the card to the previous / next column (same rules as the
+  // board card arrows and drag).
+  const moveM = useMutation({
+    mutationFn: (columnId: number) => moveTask(taskId, columnId),
+    onSuccess: () => {
+      message.success('已移动')
+      invalidate()
+    },
+    onError: (e) => message.error(errMessage(e)),
+  })
   const commentM = useMutation({
     mutationFn: async ({ text, files }: { text: string; files: File[] }) => {
       const c = await commentTask(taskId, text)
@@ -145,6 +157,11 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
   // Edit permission for tags/checklists/attachments: admin/super_admin or assignee.
   const isManager = user?.role === 'admin' || user?.role === 'super_admin'
   const canEdit = !!task && !!user && (isManager || task.assignee?.id === user.id)
+  // Previous / next columns this card may be moved into (‹ 后退 / 前进 ›).
+  const cardMoves =
+    task && user
+      ? adjacentColumns(columns, task, { id: user.id, role: user.role })
+      : { prev: null, next: null }
   // Output composer shows in the 进行中 column for the assignee or a manager.
   const canCompose =
     !!task && !!user && columnKind === 'doing' && (isManager || task.assignee?.id === user.id)
@@ -364,6 +381,27 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
               </span>
               {task.is_rework && <span className="cm-chip rw">↩ 重做</span>}
             </div>
+
+            {(cardMoves.prev || cardMoves.next) && (
+              <div style={{ display: 'flex', gap: 8, margin: '2px 0 4px' }}>
+                <Button
+                  size="small"
+                  disabled={!cardMoves.prev || moveM.isPending}
+                  onClick={() => cardMoves.prev && moveM.mutate(cardMoves.prev.id)}
+                  title={cardMoves.prev ? `后退到「${cardMoves.prev.name}」` : '已在最前一列'}
+                >
+                  ‹ {cardMoves.prev ? cardMoves.prev.name : '后退'}
+                </Button>
+                <Button
+                  size="small"
+                  disabled={!cardMoves.next || moveM.isPending}
+                  onClick={() => cardMoves.next && moveM.mutate(cardMoves.next.id)}
+                  title={cardMoves.next ? `前进到「${cardMoves.next.name}」` : '已在最后一列'}
+                >
+                  {cardMoves.next ? cardMoves.next.name : '前进'} ›
+                </Button>
+              </div>
+            )}
 
             <section className="cd-sec">
               <div className="cd-sec-h">
