@@ -242,6 +242,7 @@ class AdminUserIn(BaseModel):
     role: str  # admin | member (super_admin allowed too)
     email: str | None = None
     phone: str | None = None
+    feishu_open_id: str | None = None  # set directly to skip email/phone lookup
 
 
 class AdminUserOut(BaseModel):
@@ -253,6 +254,7 @@ class AdminUserOut(BaseModel):
     department_id: int | None
     account_status: str
     invite_code: str | None = None
+    feishu_open_id: str | None = None
 
 
 class AdminUserListOut(BaseModel):
@@ -276,6 +278,7 @@ class AdminUserUpdateIn(BaseModel):
     is_active: bool | None = None
     email: str | None = None
     phone: str | None = None
+    feishu_open_id: str | None = None  # set directly to skip email/phone lookup
 
 
 class BoardIn(BaseModel):

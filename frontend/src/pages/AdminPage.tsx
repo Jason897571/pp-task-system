@@ -252,6 +252,7 @@ function UsersTab() {
   const [editUser, setEditUser] = useState<AdminUser | null>(null)
   const [editEmail, setEditEmail] = useState('')
   const [editPhone, setEditPhone] = useState('')
+  const [editOpenId, setEditOpenId] = useState('')
 
   const createM = useMutation({
     mutationFn: (body: CreateUserBody) => createUser(body),
@@ -272,8 +273,17 @@ function UsersTab() {
   })
 
   const editM = useMutation({
-    mutationFn: ({ id, email, phone }: { id: number; email: string; phone: string }) =>
-      updateUser(id, { email, phone }),
+    mutationFn: ({
+      id,
+      email,
+      phone,
+      feishu_open_id,
+    }: {
+      id: number
+      email: string
+      phone: string
+      feishu_open_id: string
+    }) => updateUser(id, { email, phone, feishu_open_id }),
     onSuccess: (u) => {
       message.success(
         u.feishu_open_id
@@ -298,6 +308,7 @@ function UsersTab() {
   const openEdit = (u: AdminUser) => {
     setEditEmail(u.email ?? '')
     setEditPhone(u.phone ?? '')
+    setEditOpenId(u.feishu_open_id ?? '')
     setEditUser(u)
   }
 
@@ -426,6 +437,9 @@ function UsersTab() {
           <Form.Item name="phone" label="飞书手机号（用于 @ 通知）">
             <Input placeholder="可选，飞书绑定的手机号" />
           </Form.Item>
+          <Form.Item name="feishu_open_id" label="飞书 open_id（可直接填，优先于邮箱/手机解析）">
+            <Input placeholder="可选，形如 ou_xxxxxxxx" />
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -436,12 +450,18 @@ function UsersTab() {
         confirmLoading={editM.isPending}
         onCancel={() => setEditUser(null)}
         onOk={() =>
-          editUser && editM.mutate({ id: editUser.id, email: editEmail, phone: editPhone })
+          editUser &&
+          editM.mutate({
+            id: editUser.id,
+            email: editEmail,
+            phone: editPhone,
+            feishu_open_id: editOpenId,
+          })
         }
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 13 }}>
-          填飞书绑定的邮箱或手机号,保存后系统会自动解析 open_id 用于群里真·@。
-          解析需应用已开通通讯录权限;解析不到时 @ 会回退为文本名。
+          可直接填「飞书 open_id」精确绑定（优先生效）;或填飞书绑定的邮箱/手机号,
+          保存后系统自动解析 open_id。解析需应用已开通通讯录权限;都没有时 @ 回退为文本名。
         </Typography.Paragraph>
         <div style={{ marginBottom: 12 }}>
           <div style={{ marginBottom: 6, color: 'var(--subtle)', fontSize: 13 }}>飞书邮箱</div>
@@ -451,12 +471,22 @@ function UsersTab() {
             placeholder="飞书绑定的邮箱"
           />
         </div>
-        <div>
+        <div style={{ marginBottom: 12 }}>
           <div style={{ marginBottom: 6, color: 'var(--subtle)', fontSize: 13 }}>飞书手机号</div>
           <Input
             value={editPhone}
             onChange={(e) => setEditPhone(e.target.value)}
             placeholder="飞书绑定的手机号"
+          />
+        </div>
+        <div>
+          <div style={{ marginBottom: 6, color: 'var(--subtle)', fontSize: 13 }}>
+            飞书 open_id（直接填，优先于上面的解析）
+          </div>
+          <Input
+            value={editOpenId}
+            onChange={(e) => setEditOpenId(e.target.value)}
+            placeholder="形如 ou_xxxxxxxx，留空则用邮箱/手机解析"
           />
         </div>
       </Modal>

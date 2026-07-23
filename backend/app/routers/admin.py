@@ -72,7 +72,11 @@ def create_user(body: AdminUserIn, db: Session = Depends(get_db)):
         email=(body.email or "").strip() or None,
         phone=(body.phone or "").strip() or None,
     )
-    _resolve_feishu_open_id(user)
+    # An explicit open_id wins and skips the lookup; otherwise resolve from phone/email.
+    if (body.feishu_open_id or "").strip():
+        user.feishu_open_id = body.feishu_open_id.strip()
+    else:
+        _resolve_feishu_open_id(user)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -108,6 +112,10 @@ def update_user(user_id: int, body: AdminUserUpdateIn, db: Session = Depends(get
             user.phone = body.phone.strip() or None
         user.feishu_open_id = None
         _resolve_feishu_open_id(user)
+    # An explicit open_id always wins (set directly, no lookup); applied last so it
+    # overrides any value just re-resolved from email/phone.
+    if (body.feishu_open_id or "").strip():
+        user.feishu_open_id = body.feishu_open_id.strip()
     db.commit()
     db.refresh(user)
     return AdminUserListOut.model_validate(user)

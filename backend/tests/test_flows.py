@@ -97,6 +97,27 @@ def test_super_admin_update_user(client, world):
     assert r.json()["role"] == "admin"
 
 
+def test_super_admin_sets_feishu_open_id_directly(client, world):
+    # An explicit open_id is stored verbatim (no email/phone lookup needed).
+    h = auth_header(client, "super", "pw")
+    created = client.post(
+        "/api/admin/users",
+        headers=h,
+        json={"full_name": "直填", "department_id": world["rnd"].id, "role": "member",
+              "feishu_open_id": "ou_created123"},
+    ).json()
+    assert created["feishu_open_id"] == "ou_created123"
+
+    # update on an existing user sets it directly too
+    r = client.put(
+        f"/api/admin/users/{world['member'].id}",
+        headers=h,
+        json={"feishu_open_id": "ou_updated456"},
+    )
+    assert r.status_code == 200
+    assert r.json()["feishu_open_id"] == "ou_updated456"
+
+
 # --------------------------------------------------------------------------
 # Board visibility filtering + super_admin column edit
 # --------------------------------------------------------------------------

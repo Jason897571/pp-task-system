@@ -306,6 +306,7 @@ export interface CreateUserBody {
   role: Role
   email?: string
   phone?: string
+  feishu_open_id?: string
 }
 
 export interface UpdateUserBody {
@@ -314,4 +315,5 @@ export interface UpdateUserBody {
   is_active?: boolean
   email?: string
   phone?: string
+  feishu_open_id?: string
 }
