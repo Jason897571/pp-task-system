@@ -55,6 +55,8 @@ export interface VisibilityMatrix {
   users: { id: number; full_name: string; role: Role; department_id: number | null }[]
   // board_id -> allowed user ids; a board absent from the map = visible to all
   visibility: Record<number, number[]>
+  // board ids hidden from every admin/member (super_admin only)
+  hidden_boards: number[]
 }
 
 export interface BoardColumn {

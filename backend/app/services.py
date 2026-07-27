@@ -35,7 +35,8 @@ def visible_board_ids(db: Session, user: User) -> set[int] | None:
 
     Returns None to mean "all boards" (super_admin). For admin/member, a board
     is visible if it has no BoardMemberVisibility rows (visible to all) OR a row
-    for this user (per-user visibility matrix in 管理).
+    for this user (per-user visibility matrix in 管理) — unless it is flagged
+    members_hidden, which hides it from every admin/member.
     """
     if user.role == "super_admin":
         return None
@@ -44,6 +45,7 @@ def visible_board_ids(db: Session, user: User) -> set[int] | None:
     # also include boards with no columns
     all_board_ids |= set(db.scalars(select(Board.id)).all())
 
+    hidden = set(db.scalars(select(Board.id).where(Board.members_hidden.is_(True))).all())
     restricted = {
         bid
         for (bid,) in db.execute(select(BoardMemberVisibility.board_id).distinct()).all()
@@ -59,6 +61,8 @@ def visible_board_ids(db: Session, user: User) -> set[int] | None:
 
     visible = set()
     for bid in all_board_ids:
+        if bid in hidden:
+            continue  # restricted to nobody (super_admin only)
         if bid not in restricted or bid in user_boards:
             visible.add(bid)
     return visible

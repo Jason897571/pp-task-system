@@ -68,6 +68,10 @@ class Board(Base):
     icon: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # The single global archive board that completed cards are swept into weekly.
     is_archive: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # Hide the board from every admin/member (super_admin still sees it). Distinct
+    # from the per-user allow-list: no visibility rows = visible to all, but this
+    # flag lets super_admin restrict a board to nobody (uncheck everyone).
+    members_hidden: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     columns: Mapped[list["BoardColumn"]] = relationship(

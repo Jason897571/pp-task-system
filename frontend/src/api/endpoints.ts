@@ -71,9 +71,13 @@ export const reorderBoards = (board_ids: number[]) =>
 export const getVisibilityMatrix = () =>
   api.get<VisibilityMatrix>('/boards/visibility-matrix').then((r) => r.data)
 
-export const setBoardMemberVisibility = (boardId: number, user_ids: number[]) =>
+export const setBoardMemberVisibility = (
+  boardId: number,
+  user_ids: number[],
+  members_hidden = false,
+) =>
   api
-    .put<{ ok: boolean }>(`/boards/${boardId}/member-visibility`, { user_ids })
+    .put<{ ok: boolean }>(`/boards/${boardId}/member-visibility`, { user_ids, members_hidden })
     .then((r) => r.data)
 
 export const getColumns = (boardId: number) =>

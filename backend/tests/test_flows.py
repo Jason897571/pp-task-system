@@ -147,6 +147,36 @@ def test_board_member_visibility_restriction(client, world):
     assert any(b["id"] == bid for b in client.get("/api/boards", headers=member2).json())
 
 
+def test_board_hidden_from_all_members(client, world):
+    sup = auth_header(client, "super", "pw")
+    bid = world["board"].id
+    # hide the board from everyone (uncheck all → members_hidden)
+    r = client.put(
+        f"/api/boards/{bid}/member-visibility",
+        headers=sup,
+        json={"user_ids": [], "members_hidden": True},
+    )
+    assert r.status_code == 200
+
+    # no member/admin can see it; super_admin still can
+    member = auth_header(client, "member", "pw")
+    admin = auth_header(client, "admin", "pw")
+    assert all(b["id"] != bid for b in client.get("/api/boards", headers=member).json())
+    assert all(b["id"] != bid for b in client.get("/api/boards", headers=admin).json())
+    assert any(b["id"] == bid for b in client.get("/api/boards", headers=sup).json())
+    # the matrix reports it as hidden
+    matrix = client.get("/api/boards/visibility-matrix", headers=sup).json()
+    assert bid in matrix["hidden_boards"]
+
+    # re-checking everyone (empty list, not hidden) restores default all-visible
+    client.put(
+        f"/api/boards/{bid}/member-visibility",
+        headers=sup,
+        json={"user_ids": [], "members_hidden": False},
+    )
+    assert any(b["id"] == bid for b in client.get("/api/boards", headers=member).json())
+
+
 def test_visibility_matrix_requires_super(client, world):
     admin = auth_header(client, "admin", "pw")
     assert client.get("/api/boards/visibility-matrix", headers=admin).status_code == 403

@@ -156,6 +156,7 @@ def visibility_matrix(
             for u in users
         ],
         "visibility": vis,
+        "hidden_boards": [b.id for b in boards if b.members_hidden],
     }
 
 
@@ -166,15 +167,19 @@ def set_member_visibility(
     user: User = Depends(require_super_admin),
     db: Session = Depends(get_db),
 ):
-    """Replace a board's per-user allow-list. Empty list = visible to everyone."""
-    if db.get(Board, board_id) is None:
+    """Replace a board's per-user allow-list. Empty list = visible to everyone,
+    unless members_hidden is set, which hides the board from all admins/members."""
+    board = db.get(Board, board_id)
+    if board is None:
         raise HTTPException(status_code=404, detail="看板不存在")
+    board.members_hidden = body.members_hidden
     db.execute(
         delete(BoardMemberVisibility).where(BoardMemberVisibility.board_id == board_id)
     )
-    for uid in dict.fromkeys(body.user_ids):  # de-dupe, keep order
-        if db.get(User, uid) is not None:
-            db.add(BoardMemberVisibility(board_id=board_id, user_id=uid))
+    if not body.members_hidden:
+        for uid in dict.fromkeys(body.user_ids):  # de-dupe, keep order
+            if db.get(User, uid) is not None:
+                db.add(BoardMemberVisibility(board_id=board_id, user_id=uid))
     db.commit()
     return {"ok": True}
 

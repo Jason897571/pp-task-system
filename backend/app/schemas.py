@@ -295,8 +295,11 @@ class BoardReorderIn(BaseModel):
 
 
 class BoardMemberVisibilityIn(BaseModel):
-    # explicit allow-list of user ids; empty => visible to everyone
+    # explicit allow-list of user ids; empty => visible to everyone (unless hidden)
     user_ids: list[int]
+    # true => hide from every admin/member (super_admin only). Disambiguates the
+    # otherwise-identical "everyone" vs "nobody" empty allow-list.
+    members_hidden: bool = False
 
 
 class ColumnIn(BaseModel):

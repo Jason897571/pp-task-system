@@ -531,34 +531,51 @@ function VisibilityTab() {
   })
 
   const setM = useMutation({
-    mutationFn: ({ boardId, userIds }: { boardId: number; userIds: number[] }) =>
-      setBoardMemberVisibility(boardId, userIds),
+    mutationFn: ({
+      boardId,
+      userIds,
+      membersHidden,
+    }: {
+      boardId: number
+      userIds: number[]
+      membersHidden: boolean
+    }) => setBoardMemberVisibility(boardId, userIds, membersHidden),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['visibility-matrix'] }),
     onError: (e) => message.error(errMessage(e)),
   })
 
   if (isLoading || !data) return <Spin />
-  const { boards, users, visibility } = data
+  const { boards, users, visibility, hidden_boards } = data
   const allUserIds = users.map((u) => u.id)
+  const isHidden = (boardId: number) => hidden_boards.includes(boardId)
 
-  // unrestricted (no rows) => visible to all => every box checked
+  // unrestricted (no rows) => visible to all => every box checked; a members_hidden
+  // board is visible to nobody => every box unchecked.
   const isChecked = (boardId: number, userId: number) =>
-    visibility[boardId] === undefined || visibility[boardId].includes(userId)
+    !isHidden(boardId) &&
+    (visibility[boardId] === undefined || visibility[boardId].includes(userId))
 
   const toggle = (boardId: number, userId: number, checked: boolean) => {
-    const current =
-      visibility[boardId] === undefined ? new Set(allUserIds) : new Set(visibility[boardId])
+    // Start from the current allow-list. A hidden board shows all-unchecked, so its
+    // working set starts empty; checking someone lifts the hidden flag.
+    const current = isHidden(boardId)
+      ? new Set<number>()
+      : visibility[boardId] === undefined
+        ? new Set(allUserIds)
+        : new Set(visibility[boardId])
     if (checked) current.add(userId)
     else current.delete(userId)
-    // all checked => store empty (unrestricted); else explicit allow-list
+    // none checked => hide from everyone; all checked => unrestricted (empty list);
+    // otherwise an explicit allow-list.
+    const membersHidden = current.size === 0
     const userIds = current.size === allUserIds.length ? [] : [...current]
-    setM.mutate({ boardId, userIds })
+    setM.mutate({ boardId, userIds, membersHidden })
   }
 
   return (
     <div>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 14 }}>
-        勾选 = 该人员可见此看板；取消勾选则不可见。某看板全部勾选 = 对所有人可见（默认）。super_admin 始终可见全部，不在表内。
+        勾选 = 该人员可见此看板；取消勾选则不可见。某看板全部勾选 = 对所有人可见（默认）；全部取消勾选 = 对所有成员隐藏（仅 super_admin 可见）。super_admin 始终可见全部，不在表内。
       </Typography.Paragraph>
       <Table
         rowKey="id"
