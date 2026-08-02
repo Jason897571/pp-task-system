@@ -159,6 +159,10 @@ export const unlinkTask = (id: number, linked_id: number) =>
 export const assignTask = (id: number, assignee_id: number) =>
   api.post<Task>(`/tasks/${id}/assign`, { assignee_id }).then((r) => r.data)
 
+// Replace a task's collaborator list (full overwrite). Admin scope or the assignee.
+export const setCollaborators = (id: number, user_ids: number[]) =>
+  api.put<TaskDetail>(`/tasks/${id}/collaborators`, { user_ids }).then((r) => r.data)
+
 // Send an on-board task back to the pool (clears assignee, keeps the board).
 export const toPoolTask = (id: number) =>
   api.post<Task>(`/tasks/${id}/to-pool`).then((r) => r.data)

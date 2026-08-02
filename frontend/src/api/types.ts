@@ -99,6 +99,7 @@ export interface Task {
   description: string
   creator: User
   assignee: User | null
+  collaborators: User[]
   department_id: number
   board_id: number
   column_id: number | null // null when open / pending_approval / declined

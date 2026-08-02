@@ -11,6 +11,7 @@ function mk(id: number, priority: Task['priority'], due: string | null): Task {
     description: '',
     creator: { id: 9, full_name: 'A', role: 'admin', department_id: 1, avatar_attachment_id: null, card_color: null },
     assignee: null,
+    collaborators: [],
     department_id: 1,
     board_id: 1,
     column_id: 10,

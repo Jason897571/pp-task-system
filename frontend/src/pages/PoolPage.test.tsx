@@ -18,6 +18,7 @@ vi.mock('../api/endpoints', () => ({
         description: '',
         creator: { id: 1, full_name: '张三', role: 'admin', department_id: 1, avatar_attachment_id: null, card_color: null },
         assignee: null,
+        collaborators: [],
         department_id: 1,
         board_id: 1,
         column_id: null,
