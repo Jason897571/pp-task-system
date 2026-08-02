@@ -43,6 +43,7 @@ from app.services import (
     copy_requirement_children,
     final_column,
     hard_delete_task,
+    is_task_worker,
     log_activity,
     notify,
     review_admin_for,
@@ -102,11 +103,10 @@ def _column_kind(db: Session, task: Task) -> str | None:
 def _visible_to(db: Session, user: User, task: Task) -> bool:
     if user.role == "super_admin":
         return True
-    if user.role == "admin":
-        if admin_can_touch_task(user, task):
-            return True
-    elif task.assignee_id == user.id or task.creator_id == user.id:
-        # member: own assigned/self-submitted tasks
+    # assignee, collaborators and the creator always see their own card
+    if is_task_worker(user, task) or task.creator_id == user.id:
+        return True
+    if user.role == "admin" and admin_can_touch_task(user, task):
         return True
     # anyone may view an open pool task within their visible board + department
     # (needed to open the detail before applying); mirrors the /pool filter.
@@ -391,7 +391,7 @@ def move_task(
         raise HTTPException(status_code=400, detail="目标列不属于该看板")
 
     if user.role == "member":
-        if task.assignee_id != user.id:
+        if not is_task_worker(user, task):
             raise HTTPException(status_code=403, detail="只能移动自己的任务")
         # Completion must pass review only when the board has a review gate.
         if col.kind == "done" and review_column(db, task.board_id) is not None:
@@ -487,7 +487,7 @@ def start_task(
     task = db.get(Task, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="任务不存在")
-    if task.assignee_id != user.id:
+    if not is_task_worker(user, task):
         raise HTTPException(status_code=403, detail="只能开始自己的任务")
     if _column_kind(db, task) != "start":
         raise HTTPException(status_code=409, detail="任务不在起始列")
@@ -510,7 +510,7 @@ def submit_task(
     task = db.get(Task, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="任务不存在")
-    if task.assignee_id != user.id and not admin_can_touch_task(user, task):
+    if not can_edit_task(user, task):
         raise HTTPException(status_code=403, detail="无权提交该任务的产出")
     if _column_kind(db, task) != "doing":
         raise HTTPException(status_code=409, detail="任务不在进行中列")

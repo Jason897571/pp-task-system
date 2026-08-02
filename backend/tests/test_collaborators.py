@@ -68,3 +68,36 @@ def test_task_detail_returns_collaborators(client, db):
 
     assert resp.status_code == 200, resp.text
     assert [c["id"] for c in resp.json()["collaborators"]] == [w["member2"].id]
+
+
+def test_collaborator_can_see_and_move_task(client, db):
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["member2"]])
+    h = auth_header(client, "member2", "pw")
+
+    assert client.get(f"/api/tasks/{task.id}", headers=h).status_code == 200
+
+    resp = client.post(
+        f"/api/tasks/{task.id}/move",
+        json={"column_id": w["cols"]["doing"].id},
+        headers=h,
+    )
+    assert resp.status_code == 200, resp.text
+
+
+def test_non_collaborator_cannot_see_task(client, db):
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"])
+    h = auth_header(client, "mkt_member", "pw")
+
+    assert client.get(f"/api/tasks/{task.id}", headers=h).status_code == 403
+
+
+def test_collaborator_can_start_and_submit(client, db):
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["member2"]])
+    h = auth_header(client, "member2", "pw")
+
+    assert client.post(f"/api/tasks/{task.id}/start", headers=h).status_code == 200
+    resp = client.post(f"/api/tasks/{task.id}/submit", json={"note": "做完了"}, headers=h)
+    assert resp.status_code == 200, resp.text
