@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adjacentColumns, canDrag, canDropInto, visibleActions } from './actions'
+import { adjacentColumns, canDrag, canDropInto, isWorker, visibleActions } from './actions'
 import type { ActionContext } from './actions'
 import type { BoardColumn, Task } from '../api/types'
 
@@ -8,11 +8,22 @@ const otherMember = { id: 2, role: 'member' as const }
 const admin = { id: 9, role: 'admin' as const }
 const superAdmin = { id: 99, role: 'super_admin' as const }
 
-const onBoard = (assigneeId: number | null): ActionContext['task'] => ({
+const person = (id: number) => ({
+  id,
+  full_name: 'X',
+  role: 'member' as const,
+  department_id: 1,
+  avatar_attachment_id: null,
+  card_color: null,
+})
+
+const onBoard = (
+  assigneeId: number | null,
+  collaboratorIds: number[] = [],
+): ActionContext['task'] => ({
   lifecycle: 'on_board',
-  assignee: assigneeId
-    ? { id: assigneeId, full_name: 'X', role: 'member', department_id: 1, avatar_attachment_id: null, card_color: null }
-    : null,
+  assignee: assigneeId ? person(assigneeId) : null,
+  collaborators: collaboratorIds.map(person),
 })
 
 describe('visibleActions — member', () => {
@@ -31,7 +42,7 @@ describe('visibleActions — member', () => {
   it('sees 申请 for open pool tasks', () => {
     expect(
       visibleActions({
-        task: { lifecycle: 'open', assignee: null },
+        task: { lifecycle: 'open', assignee: null, collaborators: [] },
         columnKind: null,
         me: member,
       }),
@@ -59,7 +70,7 @@ describe('visibleActions — admin', () => {
   it('sees 审批 for pending_approval tasks', () => {
     expect(
       visibleActions({
-        task: { lifecycle: 'pending_approval', assignee: null },
+        task: { lifecycle: 'pending_approval', assignee: null, collaborators: [] },
         columnKind: null,
         me: admin,
       }),
@@ -69,7 +80,7 @@ describe('visibleActions — admin', () => {
   it('sees 分派 for open pool tasks', () => {
     expect(
       visibleActions({
-        task: { lifecycle: 'open', assignee: null },
+        task: { lifecycle: 'open', assignee: null, collaborators: [] },
         columnKind: null,
         me: admin,
       }),
@@ -84,7 +95,7 @@ describe('visibleActions — super_admin', () => {
     ])
   })
   it('can approve a member submission', () => {
-    const pending: ActionContext['task'] = { lifecycle: 'pending_approval', assignee: null }
+    const pending: ActionContext['task'] = { lifecycle: 'pending_approval', assignee: null, collaborators: [] }
     expect(visibleActions({ task: pending, columnKind: null, me: superAdmin })).toEqual(['approve'])
   })
 })
@@ -114,9 +125,13 @@ describe('adjacentColumns — card ‹ / › arrows', () => {
     ({ id, board_id: 1, name: `c${id}`, kind, position, is_final: false, requires_review }) as BoardColumn
   // start(1) → review(2, gate) → done(3). Out of order to prove sorting by position.
   const cols = [col(3, 3, 'done'), col(1, 1, 'start'), col(2, 2, 'review', true)]
-  const task = (columnId: number | null, assigneeId: number | null): Pick<Task, 'assignee' | 'column_id'> => ({
+  const task = (
+    columnId: number | null,
+    assigneeId: number | null,
+  ): Pick<Task, 'assignee' | 'collaborators' | 'column_id'> => ({
     column_id: columnId,
     assignee: assigneeId ? onBoard(assigneeId).assignee : null,
+    collaborators: [],
   })
 
   it('gives both neighbours in the middle column (admin bypasses the review gate)', () => {
@@ -135,5 +150,34 @@ describe('adjacentColumns — card ‹ / › arrows', () => {
   })
   it('gives nothing for a card the member does not own', () => {
     expect(adjacentColumns(cols, task(2, 2), member)).toEqual({ prev: null, next: null })
+  })
+})
+
+describe('collaborators', () => {
+  it('sees 开始 in the start column as a collaborator', () => {
+    expect(
+      visibleActions({ task: onBoard(2, [1]), columnKind: 'start', me: member }),
+    ).toEqual(['start'])
+  })
+
+  it('sees 提交 in the doing column as a collaborator', () => {
+    expect(
+      visibleActions({ task: onBoard(2, [1]), columnKind: 'doing', me: member }),
+    ).toEqual(['submit'])
+  })
+
+  it('lets a collaborator drag the card', () => {
+    expect(canDrag(onBoard(2, [1]), member)).toBe(true)
+  })
+
+  it('still blocks a member who is neither assignee nor collaborator', () => {
+    expect(canDrag(onBoard(2, [3]), member)).toBe(false)
+    expect(visibleActions({ task: onBoard(2, [3]), columnKind: 'start', me: member })).toEqual([])
+  })
+
+  it('isWorker covers assignee and collaborators only', () => {
+    expect(isWorker(onBoard(1, [2]), 1)).toBe(true)
+    expect(isWorker(onBoard(1, [2]), 2)).toBe(true)
+    expect(isWorker(onBoard(1, [2]), 3)).toBe(false)
   })
 })

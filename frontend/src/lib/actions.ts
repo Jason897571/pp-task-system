@@ -13,14 +13,21 @@ export type ActionKey =
   | 'to_pool' // admin/super: on-board card → 放回需求池
 
 export interface ActionContext {
-  task: Pick<Task, 'lifecycle' | 'assignee'>
+  task: Pick<Task, 'lifecycle' | 'assignee' | 'collaborators'>
   columnKind: ColumnKind // kind of the task's current column (null if not on board)
   requiresReview?: boolean // task's current column is the board's review gate
   me: Pick<User, 'id' | 'role'>
 }
 
-const isAssignee = (task: ActionContext['task'], meId: number) =>
-  task.assignee?.id === meId
+// Who may work on a card: the assignee (owner) or any collaborator. Mirrors the
+// backend's services.is_task_worker.
+export function isWorker(
+  task: Pick<Task, 'assignee' | 'collaborators'>,
+  meId: number,
+): boolean {
+  if (task.assignee?.id === meId) return true
+  return task.collaborators.some((c) => c.id === meId)
+}
 
 export function visibleActions({ task, columnKind, requiresReview, me }: ActionContext): ActionKey[] {
   const actions: ActionKey[] = []
@@ -28,7 +35,7 @@ export function visibleActions({ task, columnKind, requiresReview, me }: ActionC
 
   if (role === 'member') {
     if (task.lifecycle === 'open') actions.push('apply')
-    if (task.lifecycle === 'on_board' && isAssignee(task, me.id)) {
+    if (task.lifecycle === 'on_board' && isWorker(task, me.id)) {
       if (columnKind === 'start') actions.push('start')
       if (columnKind === 'doing') actions.push('submit')
     }
@@ -56,10 +63,10 @@ export function visibleActions({ task, columnKind, requiresReview, me }: ActionC
 // Client-side drag rule (mirrors backend): member only drags own cards,
 // nobody drags directly into a done-kind column (completion must pass review).
 export function canDrag(
-  task: Pick<Task, 'assignee'>,
+  task: Pick<Task, 'assignee' | 'collaborators'>,
   me: Pick<User, 'id' | 'role'>,
 ): boolean {
-  if (me.role === 'member') return task.assignee?.id === me.id
+  if (me.role === 'member') return isWorker(task, me.id)
   return true // admin / super_admin
 }
 
@@ -82,7 +89,7 @@ export function canDropInto(
 // side means "no button" (edge of board or not permitted).
 export function adjacentColumns(
   columns: BoardColumn[],
-  task: Pick<Task, 'assignee' | 'column_id'>,
+  task: Pick<Task, 'assignee' | 'collaborators' | 'column_id'>,
   me: Pick<User, 'id' | 'role'>,
 ): { prev: BoardColumn | null; next: BoardColumn | null } {
   if (!canDrag(task, me) || task.column_id == null) return { prev: null, next: null }
