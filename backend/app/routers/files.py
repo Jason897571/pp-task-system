@@ -9,7 +9,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import Attachment, Deliverable, Task, TaskActivity, User
 from app.schemas import AttachmentOut
-from app.services import admin_can_touch_task, board_can_see, can_edit_task
+from app.services import can_edit_task, can_view_task
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api", tags=["files"])
@@ -52,23 +52,6 @@ def _task_for_owner(db: Session, owner_type: str, owner_id: int) -> Task | None:
         a = db.get(TaskActivity, owner_id)
         return db.get(Task, a.task_id) if a else None
     return None
-
-
-def _related_to_task(db: Session, user: User, task: Task) -> bool:
-    """Whoever may see the task may download its files."""
-    if user.role == "super_admin":
-        return True
-    if admin_can_touch_task(user, task):
-        return True
-    if task.assignee_id == user.id or task.creator_id == user.id:
-        return True
-    if (
-        task.lifecycle == "open"
-        and task.department_id == user.department_id
-        and board_can_see(db, user, task.board_id)
-    ):
-        return True
-    return False
 
 
 @router.post("/files/upload", response_model=AttachmentOut)
@@ -130,7 +113,7 @@ def download_file(
     # Avatars are shown across the app, so any authenticated user may fetch them.
     if att.owner_type != "avatar":
         task = _task_for_owner(db, att.owner_type, att.owner_id)
-        if task is None or not _related_to_task(db, user, task):
+        if task is None or not can_view_task(db, user, task):
             raise HTTPException(status_code=403, detail="无权下载该文件")
     path = Path(att.filepath)
     if not path.exists():

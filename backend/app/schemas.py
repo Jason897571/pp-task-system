@@ -212,6 +212,9 @@ class TaskDetailOut(TaskOut):
     attachments: list[AttachmentOut] = []
     comments: list[CommentOut] = []
     links: list[LinkedTaskOut] = []
+    # Whether the requesting user may perform the manager-scoped actions on this
+    # task (指派/转派, 审核, 放回需求池, 删除, 编辑协作人) — i.e. admin_can_touch_task.
+    can_manage: bool = False
 
 
 # ---- request bodies ----
@@ -338,6 +341,13 @@ class TaskUpdateIn(BaseModel):
 class AssignIn(BaseModel):
     assignee_id: int
     collaborator_ids: list[int] | None = None
+
+
+class DuplicateIn(BaseModel):
+    """POST /tasks/{id}/duplicate — the copy's assignee. Collaborators are not
+    copied, so this body deliberately has no collaborator_ids."""
+
+    assignee_id: int
 
 
 class CollaboratorsIn(BaseModel):

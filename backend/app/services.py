@@ -232,6 +232,26 @@ def can_edit_task(user: User, task: Task) -> bool:
     return is_task_worker(user, task)
 
 
+def can_view_task(db: Session, user: User, task: Task) -> bool:
+    """Who may see a task (and therefore download its files). The single source of
+    truth for task read visibility — used by the task endpoints and the file
+    download endpoint."""
+    if admin_can_touch_task(user, task):  # super_admin, dept scope, creator/assignee admin
+        return True
+    # assignee, collaborators and the creator always see their own card
+    if is_task_worker(user, task) or task.creator_id == user.id:
+        return True
+    # anyone may view an open pool task within their visible board + department
+    # (needed to open the detail before applying); mirrors the /pool filter.
+    if (
+        task.lifecycle == "open"
+        and task.department_id == user.department_id
+        and board_can_see(db, user, task.board_id)
+    ):
+        return True
+    return False
+
+
 def attachments_for(db: Session, owner_type: str, owner_id: int) -> list[Attachment]:
     return list(
         db.scalars(
@@ -367,9 +387,10 @@ def serialize_linked_task(db: Session, t: Task) -> dict:
     ).model_dump()
 
 
-def serialize_task_detail(db: Session, task: Task):
-    """Build a TaskDetailOut: Task fields + deliverables(+attachments)/applications/
-    checklists/attachments/comments/links."""
+def serialize_task_detail(db: Session, task: Task, user: User):
+    """Build a TaskDetailOut for `user`: Task fields + deliverables(+attachments)/
+    applications/checklists/attachments/comments/links, plus can_manage — whether
+    `user` may perform the manager-scoped actions on this task."""
     from app.schemas import AttachmentOut, CommentOut, DeliverableOut, TaskDetailOut, UserOut
 
     base = serialize_task(db, task).model_dump()
@@ -414,6 +435,10 @@ def serialize_task_detail(db: Session, task: Task):
         )
     base["comments"] = comments
     base["links"] = [serialize_linked_task(db, lt) for lt in linked_tasks(db, task.id)]
+    # Manager-scoped actions (reassign / review / to-pool / delete / collaborators)
+    # all require admin scope on the backend. Being a collaborator grants visibility
+    # but not management, so the frontend must be told rather than guess from role.
+    base["can_manage"] = admin_can_touch_task(user, task)
     return TaskDetailOut.model_validate(base)
 
 

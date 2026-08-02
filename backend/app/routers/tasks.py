@@ -24,6 +24,7 @@ from app.schemas import (
     CollaboratorsIn,
     CommentIn,
     CommentOut,
+    DuplicateIn,
     LinkedTaskOut,
     LinkIn,
     MoveBoardIn,
@@ -41,6 +42,7 @@ from app.services import (
     apply_assignee,
     board_can_see,
     can_edit_task,
+    can_view_task,
     column_of_kind,
     copy_requirement_children,
     final_column,
@@ -117,30 +119,27 @@ def _resolve_collaborators(db: Session, ids: list[int], assignee_id: int | None)
     return people
 
 
+def _sync_collaborators(db: Session, task: Task, people: list[User]) -> list[User]:
+    """Replace the task's collaborator list and notify everyone added or removed.
+    Returns the added users so the caller can post the Feishu card after commit.
+    Call it after apply_assignee, so a collaborator promoted to assignee counts as
+    neither added nor removed (they get the 指派 notification instead)."""
+    before = {c.id for c in task.collaborators}
+    task.collaborators = people
+    after = {u.id for u in people}
+    added = [u for u in people if u.id not in before]
+    for u in added:
+        notify(db, u.id, "collaborator", f"你被加入任务「{task.title}」的协作", task.id)
+    for uid in before - after:
+        notify(db, uid, "collaborator", f"你已被移出任务「{task.title}」的协作", task.id)
+    return added
+
+
 def _column_kind(db: Session, task: Task) -> str | None:
     if task.column_id is None:
         return None
     col = db.get(BoardColumn, task.column_id)
     return col.kind if col else None
-
-
-def _visible_to(db: Session, user: User, task: Task) -> bool:
-    if user.role == "super_admin":
-        return True
-    # assignee, collaborators and the creator always see their own card
-    if is_task_worker(user, task) or task.creator_id == user.id:
-        return True
-    if user.role == "admin" and admin_can_touch_task(user, task):
-        return True
-    # anyone may view an open pool task within their visible board + department
-    # (needed to open the detail before applying); mirrors the /pool filter.
-    if (
-        task.lifecycle == "open"
-        and task.department_id == user.department_id
-        and board_can_see(db, user, task.board_id)
-    ):
-        return True
-    return False
 
 
 @router.get("/tasks", response_model=list[TaskOut])
@@ -174,7 +173,7 @@ def list_tasks(
         stmt = stmt.where(Task.board_id.in_(ids))
 
     rows = db.scalars(stmt.order_by(Task.id)).all()
-    rows = [t for t in rows if _visible_to(db, user, t)]
+    rows = [t for t in rows if can_view_task(db, user, t)]
     return [serialize_task(db, t) for t in rows]
 
 
@@ -262,9 +261,9 @@ def get_task(
     task = db.get(Task, task_id)
     if task is None or task.deleted_at is not None:
         raise HTTPException(status_code=404, detail="任务不存在")
-    if not _visible_to(db, user, task):
+    if not can_view_task(db, user, task):
         raise HTTPException(status_code=403, detail="无权查看该任务")
-    return serialize_task_detail(db, task)
+    return serialize_task_detail(db, task, user)
 
 
 @router.put("/tasks/{task_id}", response_model=TaskDetailOut)
@@ -292,7 +291,7 @@ def update_task(
         task.due_date = data["due_date"]
     db.commit()
     db.refresh(task)
-    return serialize_task_detail(db, task)
+    return serialize_task_detail(db, task, user)
 
 
 @router.post("/tasks/{task_id}/assign", response_model=TaskOut)
@@ -325,15 +324,19 @@ def assign_task(
     if was_open or task.column_id is None:
         task.column_id = col.id
 
+    added: list[User] = []
     if body.collaborator_ids is not None:
-        task.collaborators = _resolve_collaborators(
-            db, body.collaborator_ids, task.assignee_id
-        )
+        people = _resolve_collaborators(db, body.collaborator_ids, task.assignee_id)
+        if {u.id for u in people} != {c.id for c in task.collaborators}:
+            log_activity(db, task, user, "collaborators")
+        added = _sync_collaborators(db, task, people)
 
     log_activity(db, task, user, "reassigned" if is_reassign else "assigned")
     notify(db, assignee.id, "assigned", f"你被指派了任务「{task.title}」", task.id)
     db.commit()
     db.refresh(task)
+    if added:
+        _feishu_task_card(task, added, "👥 加入协作", f"操作人：{_name(user)}")
     return serialize_task(db, task)
 
 
@@ -366,21 +369,13 @@ def set_collaborators(
     if len(people) != len(wanted):
         raise HTTPException(status_code=404, detail="协作人不存在")
 
-    before = {c.id for c in task.collaborators}
-    task.collaborators = people
-    after = {u.id for u in people}
-    for u in people:
-        if u.id not in before:
-            notify(db, u.id, "collaborator", f"你被加入任务「{task.title}」的协作", task.id)
-    for uid in before - after:
-        notify(db, uid, "collaborator", f"你已被移出任务「{task.title}」的协作", task.id)
+    added = _sync_collaborators(db, task, people)
     log_activity(db, task, user, "collaborators")
     db.commit()
     db.refresh(task)
-    added = [u for u in people if u.id not in before]
     if added:
         _feishu_task_card(task, added, "👥 加入协作", f"操作人：{_name(user)}")
-    return serialize_task_detail(db, task)
+    return serialize_task_detail(db, task, user)
 
 
 @router.post("/tasks/{task_id}/to-pool", response_model=TaskOut)
@@ -724,7 +719,7 @@ def comment_task(
     task = db.get(Task, task_id)
     if task is None or task.deleted_at is not None:
         raise HTTPException(status_code=404, detail="任务不存在")
-    if not _visible_to(db, user, task):
+    if not can_view_task(db, user, task):
         raise HTTPException(status_code=403, detail="无权评论该任务")
     text = body.comment.strip()
     if not text:
@@ -776,7 +771,7 @@ def link_task(
     other = db.get(Task, body.linked_task_id)
     if other is None or other.deleted_at is not None:
         raise HTTPException(status_code=404, detail="关联的任务不存在")
-    if not _visible_to(db, user, other):
+    if not can_view_task(db, user, other):
         raise HTTPException(status_code=403, detail="无权关联不可见的任务")
     a, b = sorted((task_id, other.id))
     exists = db.scalar(
@@ -814,7 +809,7 @@ def unlink_task(
 @router.post("/tasks/{task_id}/duplicate", response_model=TaskOut)
 def duplicate_task(
     task_id: int,
-    body: AssignIn,
+    body: DuplicateIn,
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):

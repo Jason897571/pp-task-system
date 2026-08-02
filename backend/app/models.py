@@ -222,7 +222,7 @@ class TaskActivity(Base):
     task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"))
     actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     action: Mapped[str] = mapped_column(String(20))
-    # assigned|reassigned|submitted|approved|rejected|commented
+    # assigned|reassigned|submitted|approved|rejected|commented|collaborators
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

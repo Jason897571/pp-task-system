@@ -1,5 +1,7 @@
 """Tests for task collaborators (multi-person collaboration)."""
 
+import io
+
 from sqlalchemy import select
 
 from app.models import Notification, Task
@@ -337,3 +339,82 @@ def test_task_list_by_assignee_includes_collaborations(client, db):
 
     assert resp.status_code == 200, resp.text
     assert [t["id"] for t in resp.json()] == [task.id]
+
+
+def test_collaborator_can_download_task_attachment(client, db):
+    # A collaborator may upload to the task (can_edit_task), so they must be able
+    # to download too — inline images in the description/comments render through
+    # the same endpoint.
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["member2"]])
+    admin = auth_header(client, "admin", "pw")
+
+    up = client.post(
+        "/api/files/upload",
+        headers=admin,
+        files={"file": ("spec.txt", io.BytesIO(b"spec content"), "text/plain")},
+        data={"owner_type": "task", "owner_id": str(task.id)},
+    )
+    assert up.status_code == 200, up.text
+    file_id = up.json()["id"]
+
+    collab = auth_header(client, "member2", "pw")
+    resp = client.get(f"/api/files/{file_id}", headers=collab)
+    assert resp.status_code == 200, resp.text
+    assert resp.content == b"spec content"
+
+    # an unrelated member of another department still gets 403
+    outsider = auth_header(client, "mkt_member", "pw")
+    assert client.get(f"/api/files/{file_id}", headers=outsider).status_code == 403
+
+
+def test_can_manage_false_for_out_of_scope_admin_collaborator(client, db):
+    # An out-of-department admin who is only a collaborator can see the card but
+    # must not be offered the manager actions — every one of them 403s.
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["mkt_admin"]])
+
+    r = client.get(f"/api/tasks/{task.id}", headers=auth_header(client, "mkt_admin", "pw"))
+    assert r.status_code == 200, r.text
+    assert r.json()["can_manage"] is False
+
+    r = client.get(f"/api/tasks/{task.id}", headers=auth_header(client, "admin", "pw"))
+    assert r.status_code == 200, r.text
+    assert r.json()["can_manage"] is True
+
+
+def test_assign_notifies_added_and_removed_collaborators(client, db):
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["member2"]])
+    h = auth_header(client, "admin", "pw")
+
+    resp = client.post(
+        f"/api/tasks/{task.id}/assign",
+        json={"assignee_id": w["member"].id, "collaborator_ids": [w["mkt_member"].id]},
+        headers=h,
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert [c["id"] for c in resp.json()["collaborators"]] == [w["mkt_member"].id]
+    added = db.scalars(
+        select(Notification).where(Notification.user_id == w["mkt_member"].id)
+    ).all()
+    assert any("加入任务" in n.message for n in added)
+    removed = db.scalars(
+        select(Notification).where(Notification.user_id == w["member2"].id)
+    ).all()
+    assert any("移出任务" in n.message for n in removed)
+
+
+def test_duplicate_ignores_collaborator_ids_field(client, db):
+    # duplicate has its own body schema — collaborator_ids is not part of it.
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["member2"]])
+    h = auth_header(client, "admin", "pw")
+
+    resp = client.post(
+        f"/api/tasks/{task.id}/duplicate", json={"assignee_id": w["member"].id}, headers=h
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["collaborators"] == []
