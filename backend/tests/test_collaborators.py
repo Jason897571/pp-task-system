@@ -324,3 +324,16 @@ def test_to_pool_clears_collaborators(client, db):
         select(Notification).where(Notification.user_id == w["member2"].id)
     ).all()
     assert any("需求池" in n.message for n in notes)
+
+
+def test_task_list_by_assignee_includes_collaborations(client, db):
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["member2"]])
+    # unrelated task: member2 is neither owner nor collaborator here
+    _make_task(db, w, w["member"])
+    h = auth_header(client, "admin", "pw")
+
+    resp = client.get(f"/api/tasks?assignee={w['member2'].id}", headers=h)
+
+    assert resp.status_code == 200, resp.text
+    assert [t["id"] for t in resp.json()] == [task.id]

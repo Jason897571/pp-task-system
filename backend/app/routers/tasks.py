@@ -14,6 +14,7 @@ from app.models import (
     BoardColumn,
     Deliverable,
     Task,
+    TaskCollaborator,
     TaskLink,
     User,
 )
@@ -146,7 +147,16 @@ def list_tasks(
     if board_id is not None:
         stmt = stmt.where(Task.board_id == board_id)
     if assignee is not None:
-        stmt = stmt.where(Task.assignee_id == assignee)
+        # "someone's tasks" = owned OR collaborated on
+        stmt = stmt.where(
+            (Task.assignee_id == assignee)
+            | select(TaskCollaborator.task_id)
+            .where(
+                TaskCollaborator.task_id == Task.id,
+                TaskCollaborator.user_id == assignee,
+            )
+            .exists()
+        )
 
     # board visibility scope
     ids = visible_board_ids(db, user)
