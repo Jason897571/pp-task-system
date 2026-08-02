@@ -323,6 +323,7 @@ class TaskIn(BaseModel):
     board_id: int
     priority: str | None = "normal"
     assignee_id: int | None = None
+    collaborator_ids: list[int] = []
     department_id: int | None = None
     due_date: datetime | None = None
 
@@ -336,6 +337,7 @@ class TaskUpdateIn(BaseModel):
 
 class AssignIn(BaseModel):
     assignee_id: int
+    collaborator_ids: list[int] | None = None
 
 
 class CollaboratorsIn(BaseModel):

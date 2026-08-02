@@ -94,6 +94,18 @@ def _name(user: User | None) -> str:
     return user.full_name if user else "某人"
 
 
+def _resolve_collaborators(db: Session, ids: list[int], assignee_id: int | None) -> list[User]:
+    """Look up collaborator users, dropping duplicates and the assignee. 404s if
+    any id is unknown."""
+    wanted = [uid for uid in dict.fromkeys(ids) if uid != assignee_id]
+    if not wanted:
+        return []
+    people = list(db.scalars(select(User).where(User.id.in_(wanted))).all())
+    if len(people) != len(wanted):
+        raise HTTPException(status_code=404, detail="协作人不存在")
+    return people
+
+
 def _column_kind(db: Session, task: Task) -> str | None:
     if task.column_id is None:
         return None
@@ -204,6 +216,16 @@ def create_task(
         task.assignee_id = None
         task.column_id = None
 
+    if body.collaborator_ids:
+        if task.id is None:
+            db.add(task)
+            db.flush()
+        task.collaborators = _resolve_collaborators(
+            db, body.collaborator_ids, task.assignee_id
+        )
+        for c in task.collaborators:
+            notify(db, c.id, "collaborator", f"你被加入任务「{task.title}」的协作", task.id)
+
     if task.id is None:
         db.add(task)
     db.commit()
@@ -283,6 +305,11 @@ def assign_task(
     if was_open or task.column_id is None:
         task.column_id = col.id
 
+    if body.collaborator_ids is not None:
+        task.collaborators = _resolve_collaborators(
+            db, body.collaborator_ids, task.assignee_id
+        )
+
     log_activity(db, task, user, "reassigned" if is_reassign else "assigned")
     notify(db, assignee.id, "assigned", f"你被指派了任务「{task.title}」", task.id)
     db.commit()
@@ -345,14 +372,25 @@ def task_to_pool(
         raise HTTPException(status_code=409, detail="只有看板上的任务可以放入需求池")
 
     former_assignee_id = task.assignee_id
+    former_collaborator_ids = [c.id for c in task.collaborators]
     task.lifecycle = "open"
     task.assignee_id = None
     task.column_id = None
+    # returning to the pool re-opens the task, so the collaboration ends too
+    task.collaborators = []
     log_activity(db, task, user, "to_pool")
     if former_assignee_id is not None:
         notify(
             db,
             former_assignee_id,
+            "to_pool",
+            f"任务「{task.title}」已被放回需求池",
+            task.id,
+        )
+    for uid in former_collaborator_ids:
+        notify(
+            db,
+            uid,
             "to_pool",
             f"任务「{task.title}」已被放回需求池",
             task.id,

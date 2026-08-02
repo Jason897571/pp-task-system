@@ -199,3 +199,53 @@ def test_collaborator_cannot_edit_the_collaborator_list(client, db):
     )
 
     assert resp.status_code == 403
+
+
+def test_create_task_with_collaborators(client, db):
+    w = standard_world(db)
+    h = auth_header(client, "admin", "pw")
+
+    resp = client.post(
+        "/api/tasks",
+        json={
+            "title": "带协作人的任务",
+            "board_id": w["board"].id,
+            "assignee_id": w["member"].id,
+            "collaborator_ids": [w["member2"].id],
+        },
+        headers=h,
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert [c["id"] for c in resp.json()["collaborators"]] == [w["member2"].id]
+
+
+def test_reassign_keeps_collaborators_and_dedupes(client, db):
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["member2"]])
+    h = auth_header(client, "admin", "pw")
+
+    resp = client.post(
+        f"/api/tasks/{task.id}/assign", json={"assignee_id": w["member2"].id}, headers=h
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["assignee"]["id"] == w["member2"].id
+    # the new owner is dropped from the collaborator list; the old owner is NOT
+    # auto-added as a collaborator
+    assert resp.json()["collaborators"] == []
+
+
+def test_to_pool_clears_collaborators(client, db):
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["member2"]])
+    h = auth_header(client, "admin", "pw")
+
+    resp = client.post(f"/api/tasks/{task.id}/to-pool", headers=h)
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["collaborators"] == []
+    notes = db.scalars(
+        select(Notification).where(Notification.user_id == w["member2"].id)
+    ).all()
+    assert any("需求池" in n.message for n in notes)

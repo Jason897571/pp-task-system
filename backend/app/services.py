@@ -139,6 +139,9 @@ def apply_assignee(task: Task, assignee: User) -> None:
     — or one created by a super_admin (no department) — becomes invisible to the
     managing admin after a hand-off."""
     task.assignee_id = assignee.id
+    # Nobody is both owner and collaborator — a reassign to an existing
+    # collaborator promotes them out of the collaborator list.
+    task.collaborators = [c for c in task.collaborators if c.id != assignee.id]
     if assignee.department_id is not None:
         task.department_id = assignee.department_id
 
