@@ -1,4 +1,4 @@
-import { useState, type ClipboardEvent } from 'react'
+import { useEffect, useState, type ClipboardEvent } from 'react'
 import { Button, DatePicker, Input, Modal, Select, Spin, Upload, App as AntApp } from 'antd'
 import type { UploadFile } from 'antd'
 import { toPickerValue, fromPickerValue, defaultDueTime } from '../lib/tz'
@@ -154,6 +154,12 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
   const collabM = useMutation({
     mutationFn: (ids: number[]) => setCollaborators(taskId, ids),
   })
+  // taskId can change without remounting (URL-driven route); close the editor
+  // and drop its draft so a stale draft is never saved against the new task.
+  useEffect(() => {
+    setEditingCollabs(false)
+    setCollabDraft([])
+  }, [taskId])
 
   const column = task ? columns.find((c) => c.id === task.column_id) ?? null : null
   const columnKind = column?.kind ?? null
@@ -721,8 +727,13 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
         title="编辑协作人"
         onCancel={() => setEditingCollabs(false)}
         onOk={() =>
-          wrap(() => collabM.mutateAsync(collabDraft), '协作人已更新').then(() =>
-            setEditingCollabs(false),
+          collabM.mutateAsync(collabDraft).then(
+            () => {
+              message.success('协作人已更新')
+              invalidate()
+              setEditingCollabs(false)
+            },
+            (e) => message.error(errMessage(e)),
           )
         }
         confirmLoading={collabM.isPending}
