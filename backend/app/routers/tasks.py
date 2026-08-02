@@ -71,11 +71,22 @@ def _due_text(task: Task) -> str | None:
     return task.due_date.replace(tzinfo=timezone.utc).astimezone(_SHANGHAI).strftime("%Y-%m-%d")
 
 
+def _mention_users(*users: User | None) -> list[User]:
+    """De-duplicate a mention list by user id, dropping Nones, keeping order."""
+    out: list[User] = []
+    seen: set[int] = set()
+    for u in users:
+        if u is not None and u.id not in seen:
+            seen.add(u.id)
+            out.append(u)
+    return out
+
+
 def _feishu_task_card(
-    task: Task, mention: User | None, header: str, footer: str, extra: str | None = None
+    task: Task, mentions: list[User], header: str, footer: str, extra: str | None = None
 ) -> None:
-    """Post a task card (title / DDL / priority / detail, @-mentioning `mention`)
-    to the group bot. `extra` appends one more body line (e.g. a comment)."""
+    """Post a task card (title / DDL / priority / detail, @-mentioning everyone in
+    `mentions`) to the group bot. `extra` appends one more body line (e.g. a comment)."""
     card = build_task_card(
         header=header,
         footer=footer,
@@ -83,8 +94,7 @@ def _feishu_task_card(
         priority=task.priority,
         due_date=_due_text(task),
         description=task.description,
-        assignee_open_id=mention.feishu_open_id if mention else None,
-        assignee_name=mention.full_name if mention else None,
+        mentions=[(u.feishu_open_id, u.full_name) for u in mentions],
         extra=extra,
         link_url=f"{settings.app_base_url.rstrip('/')}/board/{task.board_id}/card/{task.id}",
     )
@@ -367,6 +377,9 @@ def set_collaborators(
     log_activity(db, task, user, "collaborators")
     db.commit()
     db.refresh(task)
+    added = [u for u in people if u.id not in before]
+    if added:
+        _feishu_task_card(task, added, "👥 加入协作", f"操作人：{_name(user)}")
     return serialize_task_detail(db, task)
 
 
@@ -440,7 +453,7 @@ def approve_task(
         notify(db, task.creator_id, "rejected", f"你提交的需求「{task.title}」未通过审批", task.id)
         db.commit()
         db.refresh(task)
-        _feishu_task_card(task, task.creator, "🚫 需求被拒绝", f"审批人：{_name(user)}")
+        _feishu_task_card(task, _mention_users(task.creator), "🚫 需求被拒绝", f"审批人：{_name(user)}")
         return serialize_task(db, task)
 
     if body.assignee_id is None:
@@ -630,7 +643,7 @@ def submit_task(
     db.commit()
     db.refresh(task)
     if review is not None:
-        _feishu_task_card(task, task.creator, "🔍 待审核", f"提交人：{_name(user)}")
+        _feishu_task_card(task, _mention_users(task.creator), "🔍 待审核", f"提交人：{_name(user)}")
     return serialize_task(db, task)
 
 
@@ -692,7 +705,9 @@ def push_task_to_feishu(
         raise HTTPException(status_code=404, detail="任务不存在")
     if not can_edit_task(user, task):
         raise HTTPException(status_code=403, detail="无权推送该任务")
-    _feishu_task_card(task, task.assignee, "📌 任务推送", f"推送人：{_name(user)}")
+    _feishu_task_card(
+        task, _mention_users(task.assignee, *task.collaborators), "📌 任务推送", f"推送人：{_name(user)}"
+    )
     return {"ok": True}
 
 
@@ -715,21 +730,23 @@ def comment_task(
     if not text:
         raise HTTPException(status_code=400, detail="评论不能为空")
     act = log_activity(db, task, user, "commented", comment=text)
-    # Notify the people involved (assignee + creator), minus the commenter.
-    for uid in {task.assignee_id, task.creator_id} - {None, user.id}:
+    # Notify the people involved (assignee + creator + collaborators), minus the commenter.
+    involved = {task.assignee_id, task.creator_id} | {c.id for c in task.collaborators}
+    for uid in involved - {None, user.id}:
         notify(db, uid, "comment", f"任务「{task.title}」收到评论：{text}", task.id)
     db.commit()
     db.refresh(act)
     # Always push the comment to the group bot so it's visible to everyone;
-    # @-mention the counterpart — if the commenter is the assignee, mention the
-    # creator (admin), otherwise mention the assignee. No counterpart → post
-    # the card without an @-mention.
-    recipient = task.creator if user.id == task.assignee_id else task.assignee
-    if recipient is not None and recipient.id == user.id:
-        recipient = None
+    # @-mention everyone involved (assignee + collaborators + creator) except the
+    # commenter. Nobody left => post the card without an @-mention.
+    recipients = [
+        u
+        for u in _mention_users(task.assignee, *task.collaborators, task.creator)
+        if u.id != user.id
+    ]
     snippet = text if len(text) <= 100 else text[:100] + "…"
     _feishu_task_card(
-        task, recipient, "💬 新评论", f"评论人：{_name(user)}", extra=f"**💬 评论**　{snippet}"
+        task, recipients, "💬 新评论", f"评论人：{_name(user)}", extra=f"**💬 评论**　{snippet}"
     )
     return CommentOut(
         id=act.id,

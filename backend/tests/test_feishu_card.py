@@ -11,8 +11,7 @@ def _card(**over):
         priority="high",
         due_date="2026-07-20",
         description="把首屏 LCP 降到 2s 以内",
-        assignee_open_id="ou_abc",
-        assignee_name="张三",
+        mentions=[("ou_abc", "张三")],
     )
     kwargs.update(over)
     return build_task_card(**kwargs)
@@ -52,17 +51,30 @@ def test_card_mentions_assignee_by_open_id():
 
 
 def test_card_falls_back_to_plain_at_when_no_open_id():
-    body = _body(_card(assignee_open_id=None))
+    body = _body(_card(mentions=[(None, "张三")]))
     assert "<at id=" not in body
     assert "@张三" in body
 
 
 def test_card_has_no_mention_when_no_assignee():
-    body = _body(_card(assignee_open_id=None, assignee_name=None))
+    body = _body(_card(mentions=[]))
     assert "<at id=" not in body
     assert "@" not in body
     # title/priority still render
     assert "标题" in body and "紧急" in body
+
+
+def test_card_mentions_multiple_people():
+    body = _body(_card(mentions=[("ou_a", "张三"), ("ou_b", "李四")]))
+    assert "<at id=ou_a></at>" in body
+    assert "<at id=ou_b></at>" in body
+
+
+def test_card_mixes_real_and_plain_mentions():
+    """People without a feishu open_id degrade to a plain @name in the same line."""
+    body = _body(_card(mentions=[("ou_a", "张三"), (None, "李四")]))
+    assert "<at id=ou_a></at>" in body
+    assert "@李四" in body
 
 
 def test_card_omits_missing_due_and_detail_rows():

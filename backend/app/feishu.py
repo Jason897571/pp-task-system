@@ -10,6 +10,7 @@ import re
 import threading
 import urllib.error
 import urllib.request
+from collections.abc import Sequence
 
 FEISHU_BASE = "https://open.feishu.cn/open-apis"
 
@@ -68,26 +69,26 @@ def build_task_card(
     priority: str,
     due_date: str | None = None,
     description: str | None = None,
-    assignee_open_id: str | None = None,
-    assignee_name: str | None = None,
+    mentions: Sequence[tuple[str | None, str]] = (),
     extra: str | None = None,
     link_url: str | None = None,
 ) -> dict:
     """Build a Feishu interactive card for a task notification.
 
     Pure function: `due_date` is a pre-formatted string (caller handles timezone),
-    `description` is truncated here. @-mentions the assignee via <at id=...> when an
-    open_id is known, else a plain @name; when neither is given (unassigned task)
-    no mention line is shown. `extra` is an optional pre-formatted body line
-    appended last (e.g. a comment excerpt). `link_url`, if given, adds a "查看任务"
-    button that opens the task (the raw URL is not shown in the body)."""
+    `description` is truncated here. `mentions` is a list of (feishu_open_id,
+    full_name) pairs; each becomes a real <at id=...> when the open_id is known,
+    else a plain @name (text only, not a real mention). All of them share one
+    line. Empty list => no mention line. `extra` is an optional pre-formatted
+    body line appended last (e.g. a comment excerpt). `link_url`, if given, adds
+    a "查看任务" button that opens the task (the raw URL is not shown in the
+    body)."""
     badge, color = _PRIORITY_CARD.get(priority, (priority, "blue"))
 
     lines: list[str] = []
-    if assignee_open_id:
-        lines += [f"<at id={assignee_open_id}></at>", ""]
-    elif assignee_name:
-        lines += [f"@{assignee_name}", ""]
+    if mentions:
+        at = [f"<at id={oid}></at>" if oid else f"@{name}" for oid, name in mentions]
+        lines += [" ".join(at), ""]
     lines += [f"**🏷 标题**　{title}", f"**🔥 紧急**　{badge}"]
     if due_date:
         lines.append(f"**📅 DDL**　{due_date}")
