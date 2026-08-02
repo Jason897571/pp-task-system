@@ -101,3 +101,36 @@ def test_collaborator_can_start_and_submit(client, db):
     assert client.post(f"/api/tasks/{task.id}/start", headers=h).status_code == 200
     resp = client.post(f"/api/tasks/{task.id}/submit", json={"note": "做完了"}, headers=h)
     assert resp.status_code == 200, resp.text
+
+
+def test_out_of_scope_admin_collaborator_can_see_task(client, db):
+    # mkt_admin is a 市场部 admin, not creator/assignee, and the task is a
+    # 研发部 task, so admin_can_touch_task(mkt_admin, task) is False. Being
+    # added as a collaborator is the only reason they can see it.
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["mkt_admin"]])
+    h = auth_header(client, "mkt_admin", "pw")
+
+    assert client.get(f"/api/tasks/{task.id}", headers=h).status_code == 200
+
+
+def test_out_of_scope_admin_not_collaborator_cannot_see_task(client, db):
+    # Control for the test above: same admin, same task, but not added as a
+    # collaborator this time — must be 403. Proves the 200 above is caused by
+    # the collaborator relationship, not by the admin role itself.
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"])
+    h = auth_header(client, "mkt_admin", "pw")
+
+    assert client.get(f"/api/tasks/{task.id}", headers=h).status_code == 403
+
+
+def test_out_of_scope_admin_collaborator_can_start_and_submit(client, db):
+    # Same widening on the edit/submit side (can_edit_task), not just visibility.
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["mkt_admin"]])
+    h = auth_header(client, "mkt_admin", "pw")
+
+    assert client.post(f"/api/tasks/{task.id}/start", headers=h).status_code == 200
+    resp = client.post(f"/api/tasks/{task.id}/submit", json={"note": "做完了"}, headers=h)
+    assert resp.status_code == 200, resp.text
