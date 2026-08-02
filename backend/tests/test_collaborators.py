@@ -220,6 +220,31 @@ def test_create_task_with_collaborators(client, db):
     assert [c["id"] for c in resp.json()["collaborators"]] == [w["member2"].id]
 
 
+def test_create_pool_task_ignores_collaborator_ids(client, db):
+    # Pool tasks have no assignee, and collaborators may only exist alongside
+    # an owner (see test_to_pool_clears_collaborators). An admin creating a
+    # pool task with collaborator_ids must not end up with collaborators.
+    w = standard_world(db)
+    h = auth_header(client, "admin", "pw")
+
+    resp = client.post(
+        "/api/tasks",
+        json={
+            "title": "需求池任务",
+            "board_id": w["board"].id,
+            "department_id": w["rnd"].id,
+            "collaborator_ids": [w["member2"].id],
+        },
+        headers=h,
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["lifecycle"] == "open"
+    assert body["assignee"] is None
+    assert body["collaborators"] == []
+
+
 def test_reassign_keeps_collaborators_and_dedupes(client, db):
     w = standard_world(db)
     task = _make_task(db, w, w["member"], [w["member2"]])

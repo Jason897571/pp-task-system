@@ -216,7 +216,7 @@ def create_task(
         task.assignee_id = None
         task.column_id = None
 
-    if body.collaborator_ids:
+    if task.assignee_id is not None and body.collaborator_ids:
         if task.id is None:
             db.add(task)
             db.flush()
