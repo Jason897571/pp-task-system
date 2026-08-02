@@ -5,6 +5,7 @@ import io
 from sqlalchemy import select
 
 from app.models import Notification, Task
+from app.schemas import DuplicateIn
 from app.services import can_edit_task, is_task_worker
 from tests.conftest import auth_header
 from tests.factory import standard_world
@@ -406,15 +407,10 @@ def test_assign_notifies_added_and_removed_collaborators(client, db):
     assert any("移出任务" in n.message for n in removed)
 
 
-def test_duplicate_ignores_collaborator_ids_field(client, db):
-    # duplicate has its own body schema — collaborator_ids is not part of it.
-    w = standard_world(db)
-    task = _make_task(db, w, w["member"], [w["member2"]])
-    h = auth_header(client, "admin", "pw")
-
-    resp = client.post(
-        f"/api/tasks/{task.id}/duplicate", json={"assignee_id": w["member"].id}, headers=h
-    )
-
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["collaborators"] == []
+def test_duplicate_in_schema_has_no_collaborator_ids_field():
+    # duplicate has its own body schema — collaborator_ids is not part of its
+    # contract (unlike AssignIn, which the endpoint used to reuse). Because
+    # Pydantic's default extra="ignore", a request round-trip can't distinguish
+    # this from AssignIn's behavior, so we pin it directly on the schema.
+    assert "collaborator_ids" not in DuplicateIn.model_fields
+    assert set(DuplicateIn.model_fields) == {"assignee_id"}

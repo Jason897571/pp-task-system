@@ -197,4 +197,26 @@ describe('collaborators', () => {
       visibleActions({ task: onBoard(1, [9]), columnKind: 'doing', me: admin }),
     ).toEqual(['assign_board', 'to_pool'])
   })
+
+  it('does not offer 申请 to a downgraded admin on an open pool task', () => {
+    // canManage: false downgrades an admin to the member branch, but they are
+    // still an admin — pool-apply 403s any non-member, so 'apply' must not appear.
+    expect(
+      visibleActions({
+        task: { lifecycle: 'open', assignee: null, collaborators: [] },
+        columnKind: null,
+        me: admin,
+        canManage: false,
+      }),
+    ).toEqual([])
+    // a real member in the same situation is offered 申请
+    expect(
+      visibleActions({
+        task: { lifecycle: 'open', assignee: null, collaborators: [] },
+        columnKind: null,
+        me: member,
+        canManage: false,
+      }),
+    ).toEqual(['apply'])
+  })
 })

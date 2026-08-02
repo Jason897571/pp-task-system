@@ -47,7 +47,10 @@ export function visibleActions({
   const role: Role = canManage ? me.role : 'member'
 
   if (role === 'member') {
-    if (task.lifecycle === 'open') actions.push('apply')
+    // apply is a genuine-member action: a downgraded admin (canManage: false)
+    // is still an admin as far as the pool-apply endpoint is concerned, and it
+    // 403s any non-member — so gate on the real role, not the downgraded one.
+    if (task.lifecycle === 'open' && me.role === 'member') actions.push('apply')
     if (task.lifecycle === 'on_board' && isWorker(task, me.id)) {
       if (columnKind === 'start') actions.push('start')
       if (columnKind === 'doing') actions.push('submit')
