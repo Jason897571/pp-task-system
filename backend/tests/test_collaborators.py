@@ -2,6 +2,7 @@
 
 from app.models import Task
 from app.services import can_edit_task, is_task_worker
+from tests.conftest import auth_header
 from tests.factory import standard_world
 
 
@@ -56,3 +57,14 @@ def test_collaborator_can_edit_task(db):
 
     assert can_edit_task(w["member2"], task) is True
     assert can_edit_task(w["mkt_member"], task) is False
+
+
+def test_task_detail_returns_collaborators(client, db):
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["member2"]])
+    h = auth_header(client, "admin", "pw")
+
+    resp = client.get(f"/api/tasks/{task.id}", headers=h)
+
+    assert resp.status_code == 200, resp.text
+    assert [c["id"] for c in resp.json()["collaborators"]] == [w["member2"].id]

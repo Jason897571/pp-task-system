@@ -358,6 +358,7 @@ def serialize_linked_task(db: Session, t: Task) -> dict:
         board=board.name if board else None,
         column=col.name if col else None,
         assignee=UserOut.model_validate(t.assignee) if t.assignee else None,
+        collaborators=[UserOut.model_validate(c) for c in t.collaborators],
         priority=t.priority,
         due_date=t.due_date,
     ).model_dump()

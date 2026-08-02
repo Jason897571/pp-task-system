@@ -95,6 +95,7 @@ class TaskOut(BaseModel):
     description: str | None
     creator: UserOut
     assignee: UserOut | None
+    collaborators: list[UserOut] = []
     department_id: int | None
     board_id: int
     column_id: int | None
@@ -191,6 +192,7 @@ class LinkedTaskOut(BaseModel):
     board: str | None = None
     column: str | None = None
     assignee: UserOut | None = None
+    collaborators: list[UserOut] = []
     priority: str
     due_date: datetime | None = None
 
