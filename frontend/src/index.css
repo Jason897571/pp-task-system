@@ -819,6 +819,14 @@ body {
 .cm-chip.muted {
   color: #707892;
 }
+.cm-chip.collab {
+  opacity: 0.85;
+}
+.cm-chip.ghost {
+  background: transparent;
+  border: 1px dashed var(--border, #d9d9d9);
+  cursor: pointer;
+}
 .cm-desc {
   background: #0a0d17;
   border: 1px solid #ffffff0f;
