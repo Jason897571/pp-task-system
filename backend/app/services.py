@@ -213,11 +213,20 @@ def review_admin_for(db: Session, task: Task) -> User | None:
     ).first()
 
 
+def is_task_worker(user: User, task: Task) -> bool:
+    """Who is working on this task: the assignee (owner) or any collaborator.
+    Work permissions only — managing the task (reassign, review, delete, editing
+    the collaborator list) still requires admin scope or the assignee."""
+    if task.assignee_id == user.id:
+        return True
+    return any(c.id == user.id for c in task.collaborators)
+
+
 def can_edit_task(user: User, task: Task) -> bool:
-    """Who may edit a task's tags/checklists/attachments: admin scope or assignee."""
+    """Who may edit a task's tags/checklists/attachments: admin scope or a worker."""
     if admin_can_touch_task(user, task):
         return True
-    return task.assignee_id == user.id
+    return is_task_worker(user, task)
 
 
 def attachments_for(db: Session, owner_type: str, owner_id: int) -> list[Attachment]:
