@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user, require_admin
+from app.deps import get_current_user
 from app.models import Attachment, User
 from app.schemas import MeOut, MeSettingsIn, UserOut
 
@@ -78,7 +78,7 @@ def upload_my_avatar(
 
 @router.get("/users", response_model=list[UserOut])
 def list_assignable_users(
-    user: User = Depends(require_admin), db: Session = Depends(get_db)
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     """Assignable candidates for assign/transfer/approve dropdowns.
 

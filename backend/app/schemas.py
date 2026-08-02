@@ -338,6 +338,10 @@ class AssignIn(BaseModel):
     assignee_id: int
 
 
+class CollaboratorsIn(BaseModel):
+    user_ids: list[int] = []
+
+
 class ApproveIn(BaseModel):
     approve: bool
     assignee_id: int | None = None

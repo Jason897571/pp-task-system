@@ -20,6 +20,7 @@ from app.models import (
 from app.schemas import (
     ApproveIn,
     AssignIn,
+    CollaboratorsIn,
     CommentIn,
     CommentOut,
     LinkedTaskOut,
@@ -287,6 +288,44 @@ def assign_task(
     db.commit()
     db.refresh(task)
     return serialize_task(db, task)
+
+
+@router.put("/tasks/{task_id}/collaborators", response_model=TaskDetailOut)
+def set_collaborators(
+    task_id: int,
+    body: CollaboratorsIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Replace the task's collaborator list (full overwrite). Only admin scope or
+    the assignee may manage it — collaborators can work on the task but not
+    change who else is on it. The assignee is filtered out of the list so nobody
+    is both owner and collaborator."""
+    task = db.get(Task, task_id)
+    if task is None or task.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not (admin_can_touch_task(user, task) or task.assignee_id == user.id):
+        raise HTTPException(status_code=403, detail="无权修改协作人")
+
+    wanted = [uid for uid in dict.fromkeys(body.user_ids) if uid != task.assignee_id]
+    people = (
+        list(db.scalars(select(User).where(User.id.in_(wanted))).all()) if wanted else []
+    )
+    if len(people) != len(wanted):
+        raise HTTPException(status_code=404, detail="协作人不存在")
+
+    before = {c.id for c in task.collaborators}
+    task.collaborators = people
+    after = {u.id for u in people}
+    for u in people:
+        if u.id not in before:
+            notify(db, u.id, "collaborator", f"你被加入任务「{task.title}」的协作", task.id)
+    for uid in before - after:
+        notify(db, uid, "collaborator", f"你已被移出任务「{task.title}」的协作", task.id)
+    log_activity(db, task, user, "collaborators")
+    db.commit()
+    db.refresh(task)
+    return serialize_task_detail(db, task)
 
 
 @router.post("/tasks/{task_id}/to-pool", response_model=TaskOut)

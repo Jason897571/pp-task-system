@@ -1,6 +1,8 @@
 """Tests for task collaborators (multi-person collaboration)."""
 
-from app.models import Task
+from sqlalchemy import select
+
+from app.models import Notification, Task
 from app.services import can_edit_task, is_task_worker
 from tests.conftest import auth_header
 from tests.factory import standard_world
@@ -134,3 +136,66 @@ def test_out_of_scope_admin_collaborator_can_start_and_submit(client, db):
     assert client.post(f"/api/tasks/{task.id}/start", headers=h).status_code == 200
     resp = client.post(f"/api/tasks/{task.id}/submit", json={"note": "做完了"}, headers=h)
     assert resp.status_code == 200, resp.text
+
+
+def test_assignee_can_set_collaborators(client, db):
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"])
+    h = auth_header(client, "member", "pw")
+
+    resp = client.put(
+        f"/api/tasks/{task.id}/collaborators",
+        json={"user_ids": [w["member2"].id]},
+        headers=h,
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert [c["id"] for c in resp.json()["collaborators"]] == [w["member2"].id]
+    notes = db.scalars(
+        select(Notification).where(Notification.user_id == w["member2"].id)
+    ).all()
+    assert any("协作" in n.message for n in notes)
+
+
+def test_setting_collaborators_drops_removed_and_notifies(client, db):
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["member2"]])
+    h = auth_header(client, "admin", "pw")
+
+    resp = client.put(
+        f"/api/tasks/{task.id}/collaborators", json={"user_ids": []}, headers=h
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["collaborators"] == []
+    notes = db.scalars(
+        select(Notification).where(Notification.user_id == w["member2"].id)
+    ).all()
+    assert any("移出" in n.message for n in notes)
+
+
+def test_collaborator_list_excludes_the_assignee(client, db):
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"])
+    h = auth_header(client, "admin", "pw")
+
+    resp = client.put(
+        f"/api/tasks/{task.id}/collaborators",
+        json={"user_ids": [w["member"].id, w["member2"].id]},
+        headers=h,
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert [c["id"] for c in resp.json()["collaborators"]] == [w["member2"].id]
+
+
+def test_collaborator_cannot_edit_the_collaborator_list(client, db):
+    w = standard_world(db)
+    task = _make_task(db, w, w["member"], [w["member2"]])
+    h = auth_header(client, "member2", "pw")
+
+    resp = client.put(
+        f"/api/tasks/{task.id}/collaborators", json={"user_ids": []}, headers=h
+    )
+
+    assert resp.status_code == 403
