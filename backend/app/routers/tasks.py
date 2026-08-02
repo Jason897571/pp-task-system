@@ -333,6 +333,11 @@ def set_collaborators(
         raise HTTPException(status_code=404, detail="任务不存在")
     if not (admin_can_touch_task(user, task) or task.assignee_id == user.id):
         raise HTTPException(status_code=403, detail="无权修改协作人")
+    if task.assignee_id is None:
+        # A pool task has no owner to collaborate with — reject regardless of
+        # whether user_ids is empty, so the pool/collaborator invariant doesn't
+        # depend on the caller's payload.
+        raise HTTPException(status_code=409, detail="需求池任务没有负责人，无法设置协作人")
 
     wanted = [uid for uid in dict.fromkeys(body.user_ids) if uid != task.assignee_id]
     people = (

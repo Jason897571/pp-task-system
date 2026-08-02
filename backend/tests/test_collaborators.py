@@ -245,6 +245,56 @@ def test_create_pool_task_ignores_collaborator_ids(client, db):
     assert body["collaborators"] == []
 
 
+def _make_pool_task(client, w, h):
+    resp = client.post(
+        "/api/tasks",
+        json={
+            "title": "需求池任务",
+            "board_id": w["board"].id,
+            "department_id": w["rnd"].id,
+        },
+        headers=h,
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()["id"]
+
+
+def test_set_collaborators_rejected_on_pool_task(client, db):
+    # A pool task has no assignee to collaborate with — set_collaborators must
+    # reject even though admin_can_touch_task passes, closing the second path
+    # (besides create_task) to an ownerless task with collaborators.
+    w = standard_world(db)
+    h = auth_header(client, "admin", "pw")
+    task_id = _make_pool_task(client, w, h)
+
+    resp = client.put(
+        f"/api/tasks/{task_id}/collaborators",
+        json={"user_ids": [w["member2"].id]},
+        headers=h,
+    )
+
+    assert resp.status_code == 409, resp.text
+    task = db.get(Task, task_id)
+    assert task.collaborators == []
+
+
+def test_set_collaborators_rejected_on_pool_task_even_with_empty_list(client, db):
+    # Setting an empty list on a pool task would be a no-op reaching the same
+    # end state the rule wants, but the guard rejects it unconditionally so the
+    # invariant doesn't depend on the caller's payload.
+    w = standard_world(db)
+    h = auth_header(client, "admin", "pw")
+    task_id = _make_pool_task(client, w, h)
+
+    resp = client.put(
+        f"/api/tasks/{task_id}/collaborators",
+        json={"user_ids": []},
+        headers=h,
+    )
+
+    assert resp.status_code == 409, resp.text
+
+
 def test_reassign_keeps_collaborators_and_dedupes(client, db):
     w = standard_world(db)
     task = _make_task(db, w, w["member"], [w["member2"]])
