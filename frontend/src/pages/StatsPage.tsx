@@ -191,9 +191,16 @@ export function StatsPage() {
     queryFn: getMemberStats,
   })
 
+  // getTasks({ assignee }) means "owned OR collaborated on", but 人员统计 counts by
+  // 主负责人 only (/api/stats). Keep the drawer consistent with the table it opens
+  // from: drop the tasks this person merely collaborates on.
   const { data: memberTasks = [], isLoading: tasksLoading } = useQuery({
     queryKey: ['member-tasks', memberTask?.user.id],
-    queryFn: () => getTasks({ assignee: memberTask!.user.id }),
+    queryFn: async () => {
+      const id = memberTask!.user.id
+      const rows = await getTasks({ assignee: id })
+      return rows.filter((t) => t.assignee?.id === id)
+    },
     enabled: memberTask !== null,
   })
 

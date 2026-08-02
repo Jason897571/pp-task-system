@@ -180,4 +180,21 @@ describe('collaborators', () => {
     expect(isWorker(onBoard(1, [2]), 2)).toBe(true)
     expect(isWorker(onBoard(1, [2]), 3)).toBe(false)
   })
+
+  it('offers an out-of-scope admin collaborator worker actions only', () => {
+    // can_manage=false: the card is visible because they collaborate on it, but
+    // 指派/转派 · 放回需求池 would 403 (admin_can_touch_task is department-scoped).
+    expect(
+      visibleActions({
+        task: onBoard(1, [9]),
+        columnKind: 'doing',
+        me: admin,
+        canManage: false,
+      }),
+    ).toEqual(['submit'])
+    // with scope, the same admin gets the manager toolbar
+    expect(
+      visibleActions({ task: onBoard(1, [9]), columnKind: 'doing', me: admin }),
+    ).toEqual(['assign_board', 'to_pool'])
+  })
 })

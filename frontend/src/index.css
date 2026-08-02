@@ -452,7 +452,7 @@ body {
 }
 .card-avs { display: flex; align-items: center; gap: 2px; }
 .card-avs .collab { margin-left: -6px; }
-.card-av-more { font-size: 11px; color: var(--muted, #999); margin-left: 2px; }
+.card-av-more { font-size: 11px; color: var(--subtle); margin-left: 2px; }
 /* custom avatar image (shares .av-sm round shape) */
 .av-img {
   object-fit: cover;
@@ -824,7 +824,7 @@ body {
 }
 .cm-chip.ghost {
   background: transparent;
-  border: 1px dashed var(--border, #d9d9d9);
+  border: 1px dashed var(--line);
   cursor: pointer;
 }
 .cm-desc {

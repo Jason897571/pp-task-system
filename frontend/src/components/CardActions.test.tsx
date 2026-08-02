@@ -35,6 +35,7 @@ function makeTask(over: Partial<TaskDetail>): TaskDetail {
     attachments: [],
     comments: [],
     links: [],
+    can_manage: true,
     ...over,
   }
 }
