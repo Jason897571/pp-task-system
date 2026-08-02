@@ -32,7 +32,7 @@ import { CardDetailModal } from '../components/CardDetailModal'
 import { CardFront } from '../components/TaskCard'
 import { UrgencyMatrix } from '../components/UrgencyMatrix'
 import { groupByWeek } from '../lib/weeks'
-import { canDropInto } from '../lib/actions'
+import { canDropInto, isWorker } from '../lib/actions'
 import type { BoardColumn, CreateTaskBody, Task } from '../api/types'
 
 export function BoardPage() {
@@ -254,8 +254,8 @@ export function BoardPage() {
     !q ||
     t.title.toLowerCase().includes(q) ||
     (t.assignee?.full_name.toLowerCase().includes(q) ?? false)
-  // "我的" scope (admin/super) keeps only cards assigned to the current user.
-  const inScope = (t: Task) => !mineOnly || t.assignee?.id === user?.id
+  // "我的" scope (admin/super) keeps cards where the current user is the assignee or a collaborator.
+  const inScope = (t: Task) => !mineOnly || (!!user && isWorker(t, user.id))
   // Tag filter: a card matches when it carries ANY of the selected tags (OR).
   const matchesTags = (t: Task) =>
     selectedTagIds.length === 0 || t.tags.some((tag) => selectedTagIds.includes(tag.id))
