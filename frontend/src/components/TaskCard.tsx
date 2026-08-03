@@ -96,14 +96,24 @@ export function CardFront({
       )}
       <div className="card-no" title="任务编号">#{task.id}</div>
       <div className="card-title">{task.title}</div>
-      {(chips.length > 0 || task.assignee) && (
+      {(chips.length > 0 || task.assignee || task.collaborators.length > 0) && (
         <>
           <div className="card-divider" />
           <div className="card-meta">
             <div className="meta-chips">{chips}</div>
-            {task.assignee && (
-              <UserAvatar user={task.assignee} size={26} className="card-av" />
-            )}
+            <div className="card-avs">
+              {task.assignee && (
+                <UserAvatar user={task.assignee} size={26} className="card-av" />
+              )}
+              {task.collaborators.slice(0, 3).map((c) => (
+                <span key={c.id} title={`协作人：${c.full_name}`}>
+                  <UserAvatar user={c} size={22} className="card-av collab" />
+                </span>
+              ))}
+              {task.collaborators.length > 3 && (
+                <span className="card-av-more">+{task.collaborators.length - 3}</span>
+              )}
+            </div>
           </div>
         </>
       )}

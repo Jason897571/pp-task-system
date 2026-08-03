@@ -1,4 +1,4 @@
-import { useState, type ClipboardEvent } from 'react'
+import { useEffect, useState, type ClipboardEvent } from 'react'
 import { Button, DatePicker, Input, Modal, Select, Spin, Upload, App as AntApp } from 'antd'
 import type { UploadFile } from 'antd'
 import { toPickerValue, fromPickerValue, defaultDueTime } from '../lib/tz'
@@ -14,6 +14,7 @@ import {
   moveTask,
   pushTaskToFeishu,
   reviewTask,
+  setCollaborators,
   startTask,
   submitTask,
   toPoolTask,
@@ -30,7 +31,7 @@ import { LinkedTasksSection } from './LinkedTasksSection'
 import { TagsSection } from './TagsSection'
 import { UserAvatar } from './UserAvatar'
 import { dueLabel, dueState, PRIORITY_LABEL, PRIORITY_OPTIONS } from '../lib/badges'
-import { adjacentColumns } from '../lib/actions'
+import { adjacentColumns, isWorker } from '../lib/actions'
 import { imagesFromClipboard } from '../lib/clipboard'
 
 interface Props {
@@ -49,11 +50,10 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
     queryFn: () => getTask(taskId),
   })
 
-  // Candidate assignees for admin assign/approve — only admins fetch the directory.
+  // Candidate people for assign/approve and the collaborator editor.
   const { data: users = [] } = useQuery({
     queryKey: ['assignable-users'],
     queryFn: getAssignableUsers,
-    enabled: user?.role === 'admin' || user?.role === 'super_admin',
   })
 
   const invalidate = () => {
@@ -149,22 +149,44 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
   const [descDraft, setDescDraft] = useState('')
   const [outNote, setOutNote] = useState('')
   const [outFiles, setOutFiles] = useState<UploadFile[]>([])
+  const [editingCollabs, setEditingCollabs] = useState(false)
+  const [collabDraft, setCollabDraft] = useState<number[]>([])
+  const collabM = useMutation({
+    mutationFn: (ids: number[]) => setCollaborators(taskId, ids),
+  })
+  // taskId can change without remounting (URL-driven route); close the editor
+  // and drop its draft so a stale draft is never saved against the new task.
+  useEffect(() => {
+    setEditingCollabs(false)
+    setCollabDraft([])
+  }, [taskId])
 
   const column = task ? columns.find((c) => c.id === task.column_id) ?? null : null
   const columnKind = column?.kind ?? null
   const requiresReview = column?.requires_review ?? false
 
-  // Edit permission for tags/checklists/attachments: admin/super_admin or assignee.
-  const isManager = user?.role === 'admin' || user?.role === 'super_admin'
-  const canEdit = !!task && !!user && (isManager || task.assignee?.id === user.id)
+  // Manager-scoped actions (指派/转派, 审核, 放回需求池, 删除, 编辑协作人). The backend
+  // computes this (services.admin_can_touch_task) because it is department-scoped,
+  // not role-only: an out-of-department admin can see a card they collaborate on
+  // but every manager endpoint would 403 for them.
+  const canManage = !!task && task.can_manage
+  // Edit permission for tags/checklists/attachments: manager scope, the assignee,
+  // or a collaborator. Mirrors the backend's services.can_edit_task.
+  const worker = !!task && !!user && isWorker(task, user.id)
+  const canEdit = !!task && !!user && (canManage || worker)
+  // Only manager scope or the assignee may manage who else works on the card. A
+  // pool task (no assignee) must never hold collaborators — the backend 409s
+  // any PUT /collaborators on it, so the editor isn't offered there even for
+  // a manager.
+  const canManageCollaborators =
+    !!task && !!user && !!task.assignee && (canManage || task.assignee.id === user.id)
   // Previous / next columns this card may be moved into (‹ 后退 / 前进 ›).
   const cardMoves =
     task && user
       ? adjacentColumns(columns, task, { id: user.id, role: user.role })
       : { prev: null, next: null }
-  // Output composer shows in the 进行中 column for the assignee or a manager.
-  const canCompose =
-    !!task && !!user && columnKind === 'doing' && (isManager || task.assignee?.id === user.id)
+  // Output composer shows in the 进行中 column for the assignee, a collaborator, or a manager.
+  const canCompose = !!task && !!user && columnKind === 'doing' && (canManage || worker)
 
   const saveTitle = () => {
     const next = titleDraft.trim()
@@ -297,6 +319,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
       columnKind={columnKind}
       requiresReview={requiresReview}
       me={{ id: user.id, role: user.role }}
+      canManage={canManage}
       assignableUsers={assignableUsers(users, task.applications.map((a) => a.applicant))}
       busy={busy}
       onStart={() => wrap(() => startM.mutateAsync(), '已开始')}
@@ -312,14 +335,15 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
         )
       }
       onAssign={(id) => wrap(() => assignM.mutateAsync(id), '已指派')}
-      onToPool={isManager ? () => wrap(() => toPoolM.mutateAsync(), '已放入需求池') : undefined}
+      onToPool={canManage ? () => wrap(() => toPoolM.mutateAsync(), '已放入需求池') : undefined}
       onComment={(text, files) => wrap(() => commentM.mutateAsync({ text, files }), '评论已发送')}
-      onDelete={isManager ? () => deleteM.mutate() : undefined}
+      onDelete={canManage ? () => deleteM.mutate() : undefined}
     />
   )
 
   return (
-    <Modal open width={720} footer={null} onCancel={handleClose} title={null} className="cm-modal">
+    <>
+      <Modal open width={720} footer={null} onCancel={handleClose} title={null} className="cm-modal">
       {isLoading || !task || !user ? (
         <div style={{ display: 'grid', placeItems: 'center', height: 220, background: '#0f1320' }}>
           <Spin />
@@ -369,6 +393,24 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                 </span>
               ) : (
                 <span className="cm-chip muted">未指派</span>
+              )}
+              {task.collaborators.map((c) => (
+                <span className="cm-chip collab" key={c.id} title="协作人">
+                  <UserAvatar user={c} size={18} />
+                  {c.full_name}
+                </span>
+              ))}
+              {canManageCollaborators && (
+                <button
+                  type="button"
+                  className="cm-chip ghost"
+                  onClick={() => {
+                    setCollabDraft(task.collaborators.map((c) => c.id))
+                    setEditingCollabs(true)
+                  }}
+                >
+                  ＋协作人
+                </button>
               )}
               <span className="cm-chip">{column ? column.name : lifecycleLabel(task.lifecycle)}</span>
               {task.due_date && due && (
@@ -637,7 +679,7 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
                         <AttachmentList
                           attachments={c.attachments}
                           pill
-                          deletable={isManager}
+                          deletable={canManage}
                           onDeleted={invalidate}
                         />
                       </div>
@@ -684,7 +726,36 @@ export function CardDetailModal({ taskId, columns, onClose }: Props) {
           </div>
         </div>
       )}
-    </Modal>
+      </Modal>
+      <Modal
+        open={editingCollabs}
+        title="编辑协作人"
+        onCancel={() => setEditingCollabs(false)}
+        onOk={() =>
+          collabM.mutateAsync(collabDraft).then(
+            () => {
+              message.success('协作人已更新')
+              invalidate()
+              setEditingCollabs(false)
+            },
+            (e) => message.error(errMessage(e)),
+          )
+        }
+        confirmLoading={collabM.isPending}
+      >
+        <Select
+          mode="multiple"
+          style={{ width: '100%' }}
+          placeholder="选择协作人"
+          value={collabDraft}
+          onChange={setCollabDraft}
+          optionFilterProp="label"
+          options={users
+            .filter((u) => u.id !== task?.assignee?.id)
+            .map((u) => ({ value: u.id, label: u.full_name }))}
+        />
+      </Modal>
+    </>
   )
 }
 

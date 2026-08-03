@@ -10,6 +10,8 @@ interface Props {
   columnKind: import('../api/types').ColumnKind
   requiresReview?: boolean
   me: Pick<User, 'id' | 'role'>
+  // TaskDetail.can_manage — manager actions are department-scoped, not role-only.
+  canManage?: boolean
   // Candidate assignees for admin assign/approve (members + self). Optional.
   assignableUsers?: User[]
   busy?: boolean
@@ -29,9 +31,9 @@ type Pane = null | 'comment' | 'assign' | 'approve'
 // Role+column-gated actions. Members get a single primary button; managers get a
 // compact toolbar (✓通过 ↩打回 ┃ 💬评论 👤指派 🗑) with click-to-expand panes.
 export function CardActions(props: Props) {
-  const { task, columnKind, requiresReview, me, busy, onDelete } = props
+  const { task, columnKind, requiresReview, me, canManage, busy, onDelete } = props
   const { message } = AntApp.useApp()
-  const actions = visibleActions({ task, columnKind, requiresReview, me })
+  const actions = visibleActions({ task, columnKind, requiresReview, me, canManage })
   const assignablePool = props.assignableUsers ?? []
 
   const hasReview = actions.includes('review')

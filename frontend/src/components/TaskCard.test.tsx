@@ -10,6 +10,7 @@ function makeTask(over: Partial<Task>): Task {
     description: '',
     creator: { id: 9, full_name: 'A', role: 'admin', department_id: 1, avatar_attachment_id: null, card_color: null },
     assignee: null,
+    collaborators: [],
     department_id: 1,
     board_id: 1,
     column_id: 10,
@@ -28,6 +29,15 @@ function makeTask(over: Partial<Task>): Task {
     ...over,
   }
 }
+
+const person = (id: number, name: string) => ({
+  id,
+  full_name: name,
+  role: 'member' as const,
+  department_id: 1,
+  avatar_attachment_id: null,
+  card_color: null,
+})
 
 describe('CardFront checklist badge', () => {
   it('renders 2/5 progress (not green) when partially done', () => {
@@ -50,5 +60,26 @@ describe('CardFront checklist badge', () => {
     const task = makeTask({ checklist_stats: { done: 0, total: 0 } })
     const { container } = render(<CardFront task={task} columnKind="doing" />)
     expect(container.querySelector('.mchip.cl')).not.toBeInTheDocument()
+  })
+})
+
+describe('CardFront collaborators', () => {
+  it('renders an avatar for each collaborator next to the assignee', () => {
+    const task = makeTask({
+      assignee: person(1, '张三'),
+      collaborators: [person(2, '李四'), person(3, '王五')],
+    })
+    render(<CardFront task={task} columnKind="doing" />)
+    expect(screen.getByTitle('协作人：李四')).toBeInTheDocument()
+    expect(screen.getByTitle('协作人：王五')).toBeInTheDocument()
+  })
+
+  it('collapses more than three collaborators into a +N badge', () => {
+    const task = makeTask({
+      assignee: person(1, '张三'),
+      collaborators: [2, 3, 4, 5, 6].map((id) => person(id, `协作${id}`)),
+    })
+    render(<CardFront task={task} columnKind="doing" />)
+    expect(screen.getByText('+2')).toBeInTheDocument()
   })
 })

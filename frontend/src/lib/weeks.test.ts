@@ -9,6 +9,7 @@ function task(id: number, archived_at: string | null): Task {
     description: "",
     creator: { id: 1, full_name: 'C', role: 'admin', department_id: 1, avatar_attachment_id: null, card_color: null },
     assignee: null,
+    collaborators: [],
     department_id: 1,
     board_id: 9,
     column_id: 1,

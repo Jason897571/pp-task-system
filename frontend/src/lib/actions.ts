@@ -3,8 +3,8 @@
 import type { BoardColumn, ColumnKind, Role, Task, User } from '../api/types'
 
 export type ActionKey =
-  | 'start' // member: start-kind & is assignee
-  | 'submit' // member: doing-kind & is assignee
+  | 'start' // worker (assignee or collaborator): start-kind column
+  | 'submit' // worker (assignee or collaborator): doing-kind column
   | 'apply' // member: open (pool)
   | 'review' // admin: review-kind
   | 'approve' // admin: pending_approval
@@ -13,22 +13,45 @@ export type ActionKey =
   | 'to_pool' // admin/super: on-board card → 放回需求池
 
 export interface ActionContext {
-  task: Pick<Task, 'lifecycle' | 'assignee'>
+  task: Pick<Task, 'lifecycle' | 'assignee' | 'collaborators'>
   columnKind: ColumnKind // kind of the task's current column (null if not on board)
   requiresReview?: boolean // task's current column is the board's review gate
   me: Pick<User, 'id' | 'role'>
+  // Backend-computed TaskDetail.can_manage: an admin's manager actions are also
+  // department-scoped, so role alone may over-offer them (an out-of-department
+  // admin can still see a card they collaborate on). Defaults to true for callers
+  // that only have a list-level Task and therefore no such card open.
+  canManage?: boolean
 }
 
-const isAssignee = (task: ActionContext['task'], meId: number) =>
-  task.assignee?.id === meId
+// Who may work on a card: the assignee (owner) or any collaborator. Mirrors the
+// backend's services.is_task_worker.
+export function isWorker(
+  task: Pick<Task, 'assignee' | 'collaborators'>,
+  meId: number,
+): boolean {
+  if (task.assignee?.id === meId) return true
+  return task.collaborators.some((c) => c.id === meId)
+}
 
-export function visibleActions({ task, columnKind, requiresReview, me }: ActionContext): ActionKey[] {
+export function visibleActions({
+  task,
+  columnKind,
+  requiresReview,
+  me,
+  canManage = true,
+}: ActionContext): ActionKey[] {
   const actions: ActionKey[] = []
-  const role: Role = me.role
+  // An admin without manager scope on this card gets the worker actions only —
+  // every manager endpoint would 403 for them.
+  const role: Role = canManage ? me.role : 'member'
 
   if (role === 'member') {
-    if (task.lifecycle === 'open') actions.push('apply')
-    if (task.lifecycle === 'on_board' && isAssignee(task, me.id)) {
+    // apply is a genuine-member action: a downgraded admin (canManage: false)
+    // is still an admin as far as the pool-apply endpoint is concerned, and it
+    // 403s any non-member — so gate on the real role, not the downgraded one.
+    if (task.lifecycle === 'open' && me.role === 'member') actions.push('apply')
+    if (task.lifecycle === 'on_board' && isWorker(task, me.id)) {
       if (columnKind === 'start') actions.push('start')
       if (columnKind === 'doing') actions.push('submit')
     }
@@ -53,13 +76,14 @@ export function visibleActions({ task, columnKind, requiresReview, me }: ActionC
   return actions
 }
 
-// Client-side drag rule (mirrors backend): member only drags own cards,
-// nobody drags directly into a done-kind column (completion must pass review).
+// Client-side drag rule (mirrors backend): member only drags cards they work on
+// (own or collaborated), nobody drags directly into a done-kind column
+// (completion must pass review).
 export function canDrag(
-  task: Pick<Task, 'assignee'>,
+  task: Pick<Task, 'assignee' | 'collaborators'>,
   me: Pick<User, 'id' | 'role'>,
 ): boolean {
-  if (me.role === 'member') return task.assignee?.id === me.id
+  if (me.role === 'member') return isWorker(task, me.id)
   return true // admin / super_admin
 }
 
@@ -77,12 +101,12 @@ export function canDropInto(
 }
 
 // Adjacent columns a card may be moved into by the ‹ / › card arrows — the same
-// rules as drag: only movable cards (member: own only), and drop must be allowed
+// rules as drag: only movable cards (member: own or collaborated), and drop must be allowed
 // (member can't step into a done column when the board has a review gate). A null
 // side means "no button" (edge of board or not permitted).
 export function adjacentColumns(
   columns: BoardColumn[],
-  task: Pick<Task, 'assignee' | 'column_id'>,
+  task: Pick<Task, 'assignee' | 'collaborators' | 'column_id'>,
   me: Pick<User, 'id' | 'role'>,
 ): { prev: BoardColumn | null; next: BoardColumn | null } {
   if (!canDrag(task, me) || task.column_id == null) return { prev: null, next: null }

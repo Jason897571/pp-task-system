@@ -170,10 +170,23 @@ class Task(Base):
     tags: Mapped[list["Tag"]] = relationship(
         secondary="task_tags", order_by="Tag.id"
     )
+    collaborators: Mapped[list["User"]] = relationship(
+        secondary="task_collaborators", order_by="User.id"
+    )
     checklists: Mapped[list["Checklist"]] = relationship(
         back_populates="task", order_by="Checklist.position",
         cascade="all, delete-orphan",
     )
+
+
+class TaskCollaborator(Base):
+    """A task's co-workers. The task still has exactly one assignee (the owner);
+    collaborators get the same *work* permissions but no management rights."""
+
+    __tablename__ = "task_collaborators"
+
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
 
 
 class TaskApplication(Base):
@@ -209,7 +222,7 @@ class TaskActivity(Base):
     task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"))
     actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     action: Mapped[str] = mapped_column(String(20))
-    # assigned|reassigned|submitted|approved|rejected|commented
+    # assigned|reassigned|submitted|approved|rejected|commented|collaborators
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

@@ -95,6 +95,7 @@ class TaskOut(BaseModel):
     description: str | None
     creator: UserOut
     assignee: UserOut | None
+    collaborators: list[UserOut] = []
     department_id: int | None
     board_id: int
     column_id: int | None
@@ -191,6 +192,7 @@ class LinkedTaskOut(BaseModel):
     board: str | None = None
     column: str | None = None
     assignee: UserOut | None = None
+    collaborators: list[UserOut] = []
     priority: str
     due_date: datetime | None = None
 
@@ -210,6 +212,9 @@ class TaskDetailOut(TaskOut):
     attachments: list[AttachmentOut] = []
     comments: list[CommentOut] = []
     links: list[LinkedTaskOut] = []
+    # Whether the requesting user may perform the manager-scoped actions on this
+    # task (指派/转派, 审核, 放回需求池, 删除, 编辑协作人) — i.e. admin_can_touch_task.
+    can_manage: bool = False
 
 
 # ---- request bodies ----
@@ -321,6 +326,7 @@ class TaskIn(BaseModel):
     board_id: int
     priority: str | None = "normal"
     assignee_id: int | None = None
+    collaborator_ids: list[int] = []
     department_id: int | None = None
     due_date: datetime | None = None
 
@@ -334,6 +340,18 @@ class TaskUpdateIn(BaseModel):
 
 class AssignIn(BaseModel):
     assignee_id: int
+    collaborator_ids: list[int] | None = None
+
+
+class DuplicateIn(BaseModel):
+    """POST /tasks/{id}/duplicate — the copy's assignee. Collaborators are not
+    copied, so this body deliberately has no collaborator_ids."""
+
+    assignee_id: int
+
+
+class CollaboratorsIn(BaseModel):
+    user_ids: list[int] = []
 
 
 class ApproveIn(BaseModel):

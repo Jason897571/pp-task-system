@@ -450,6 +450,9 @@ body {
   flex-shrink: 0;
   box-shadow: 0 0 0 2px #141b2e, 0 1px 3px #00000066;
 }
+.card-avs { display: flex; align-items: center; gap: 2px; }
+.card-avs .collab { margin-left: -6px; }
+.card-av-more { font-size: 11px; color: var(--subtle); margin-left: 2px; }
 /* custom avatar image (shares .av-sm round shape) */
 .av-img {
   object-fit: cover;
@@ -815,6 +818,14 @@ body {
 }
 .cm-chip.muted {
   color: #707892;
+}
+.cm-chip.collab {
+  opacity: 0.85;
+}
+.cm-chip.ghost {
+  background: transparent;
+  border: 1px dashed var(--line);
+  cursor: pointer;
 }
 .cm-desc {
   background: #0a0d17;

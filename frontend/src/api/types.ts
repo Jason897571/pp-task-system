@@ -99,6 +99,7 @@ export interface Task {
   description: string
   creator: User
   assignee: User | null
+  collaborators: User[]
   department_id: number
   board_id: number
   column_id: number | null // null when open / pending_approval / declined
@@ -171,6 +172,10 @@ export interface TaskDetail extends Task {
   attachments: Attachment[]
   comments: Comment[]
   links: LinkedTask[]
+  // Backend-computed: may the requesting user perform the manager-scoped actions
+  // on this task (指派/转派, 审核, 放回需求池, 删除, 编辑协作人)? Role alone is not
+  // enough — those endpoints are department-scoped (services.admin_can_touch_task).
+  can_manage: boolean
 }
 
 // Round-2: 每周必做 (recurring) templates.
